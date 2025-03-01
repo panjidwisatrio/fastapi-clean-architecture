@@ -169,3 +169,31 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# Azure Functions artifacts
+bin
+obj
+appsettings.json
+local_settings.json
+
+# Azurite artifacts
+__blobstorage__
+__queuestorage__
+__azurite_db*__.json
+.python_packages
+
+# logs
+logs/
+*.log
+
+# data
+data/
+
+# references
+references/
+
+# Environment files
+.env
+.env.development
+.env.testing
+.env.production
