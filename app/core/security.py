@@ -6,6 +6,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, SecurityScopes
 from sqlalchemy.orm import Session
 from app.core.database import get_db
+from app.repositories.token_blacklist_repository import TokenBlacklistRepository
 from app.repositories.user_repository import UserRepository
 from app.models.user import User
 from app.core.config import settings
@@ -53,6 +54,15 @@ async def get_current_user(
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": authenticate_value},
     )
+    
+    # Check if token is blacklisted
+    blacklist_repo = TokenBlacklistRepository(db)
+    if blacklist_repo.is_blacklisted(token):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has been revoked",
+            headers={"WWW-Authenticate": authenticate_value},
+        )
     
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
