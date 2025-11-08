@@ -11,19 +11,19 @@ class UserBase(BaseModel):
     last_name: Optional[str] = None
 
 class UserCreate(UserBase):
-    password: str
-    roles_id: Optional[int] = None
-
-class UserRegister(UserBase):
-    password: str
+    role_id: Optional[int] = None
 
 class UserUpdate(BaseModel):
-    password: Optional[str] = None
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     roles_id: Optional[int] = None
     is_verified: Optional[bool] = None
     is_active: Optional[bool] = None
+    
+class PasswordUpdate(BaseModel):
+    old_password: str
+    new_password: str
+    password_confirm: str
 
 class UserInDB(UserBase):
     id: int
