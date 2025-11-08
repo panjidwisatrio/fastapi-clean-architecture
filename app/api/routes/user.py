@@ -1,63 +1,51 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordRequestForm
 from typing import List
+from fastapi import APIRouter, Depends, status
 
-from app.core.security import get_current_user
-from app.schemas.user import User, UserCreate, UserRegister, UserUpdate
-from app.schemas.token import Token
-from app.api.dependencies import get_user_service, get_current_admin_user, get_pagination_params
+from app.schemas.user import User, UserCreate, UserUpdate
+from app.api.dependencies import get_current_user_with_permission, get_user_service, get_pagination_params
 from app.services.user_service import UserService
 
 router = APIRouter(prefix="/users", tags=["users"])
 
 @router.post("/", response_model=User, status_code=status.HTTP_201_CREATED)
-def create_user(user: UserCreate, service: UserService = Depends(get_user_service)):
-    return service.create_user(user)
-
-@router.post("/register", response_model=User, status_code=status.HTTP_201_CREATED)
-def register_user(user: UserRegister, service: UserService = Depends(get_user_service)):
-    return service.create_user(user)
-
-@router.post("/login", response_model=Token)
-def login(
-    form_data: OAuth2PasswordRequestForm = Depends(),
-    service: UserService = Depends(get_user_service)
+async def create_user(
+    user: UserCreate, 
+    service: UserService = Depends(get_user_service),
+    _: User = Depends(get_current_user_with_permission("create_user"))
 ):
-    user = service.authenticate_user(form_data.username, form_data.password)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    access_token = service.create_access_token(user)
-    return {"access_token": access_token, "token_type": "bearer"}
+    return await service.create_user(user)
 
-@router.get("/me", response_model=User)
-async def read_users_me(current_user: User = Depends(get_current_user)):
-    return current_user
+@router.get("/{user_id}", response_model=User)
+async def read_user(
+    user_id: int, 
+    service: UserService = Depends(get_user_service),
+    _: User = Depends(get_current_user_with_permission("get_user_info_by_id"))
+):
+    return service.get_user(user_id)
 
-@router.put("/me", response_model=User)
-async def update_user_me(
+@router.put("/{user_id}", response_model=User)
+async def update_user(
     user: UserUpdate,
-    current_user: User = Depends(get_current_user),
-    service: UserService = Depends(get_user_service)
+    user_id: int,
+    service: UserService = Depends(get_user_service),
+    _: User = Depends(get_current_user_with_permission("update_user_info"))
 ):
-    return service.update_user(current_user.id, user)
+    return service.update_user(user, user_id=user_id)
 
-@router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_user_me(
-    current_user: User = Depends(get_current_user),
-    service: UserService = Depends(get_user_service)
+@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def deactivate_user(
+    user_id: int,
+    service: UserService = Depends(get_user_service),
+    _: User = Depends(get_current_user_with_permission("update_user_active_status"))
 ):
-    service.delete_user(current_user.id)
+    service.deactivate_user(user_id)
     return None
 
 @router.get("/", response_model=List[User])
 async def read_users(
     skip_limit: tuple = Depends(get_pagination_params),
     service: UserService = Depends(get_user_service),
-    _: User = Depends(get_current_admin_user)
+    _: User = Depends(get_current_user_with_permission("get_all_users_info"))
 ):
     skip, limit = skip_limit
     return service.get_users(skip, limit)

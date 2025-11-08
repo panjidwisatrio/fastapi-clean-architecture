@@ -1,8 +1,9 @@
 from passlib.context import CryptContext
+from datetime import datetime, timezone
 import json
 import os
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["sha256_crypt"], deprecated="auto")
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
@@ -17,3 +18,7 @@ def load_permissions():
         permissions_data = json.load(f)
     
     return permissions_data
+
+def get_current_utc_time():
+    """Get the current UTC time."""
+    return datetime.now(timezone.utc)

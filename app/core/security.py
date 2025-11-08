@@ -1,11 +1,12 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Optional
 from jose import JWTError, jwt
-from app.core.utils import load_permissions
+from app.core.utils import get_current_utc_time, load_permissions
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, SecurityScopes
 from sqlalchemy.orm import Session
 from app.core.database import get_db
+from app.repositories.token_blacklist_repository import TokenBlacklistRepository
 from app.repositories.user_repository import UserRepository
 from app.models.user import User
 from app.core.config import settings
@@ -21,16 +22,16 @@ SCOPES = permissions_data.get("scopes", {})
 
 # Update OAuth2 scheme to support scopes loaded from JSON
 oauth2_scheme = OAuth2PasswordBearer(
-    tokenUrl="users/login",
+    tokenUrl="auth/login",
     scopes=SCOPES
 )
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
     if expires_delta:
-        expire = datetime.now(datetime.timezone.utc) + expires_delta
+        expire = get_current_utc_time() + expires_delta
     else:
-        expire = datetime.now(datetime.timezone.utc) + timedelta(minutes=15)
+        expire = get_current_utc_time() + timedelta(minutes=15)
     to_encode.update({"exp": expire})
     # Ensure subject is a string
     if "sub" in to_encode:
@@ -53,6 +54,15 @@ async def get_current_user(
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": authenticate_value},
     )
+    
+    # Check if token is blacklisted
+    blacklist_repo = TokenBlacklistRepository(db)
+    if blacklist_repo.is_blacklisted(token):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has been revoked",
+            headers={"WWW-Authenticate": authenticate_value},
+        )
     
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
