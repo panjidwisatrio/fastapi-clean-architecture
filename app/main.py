@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.routes import permission, user, role
+from app.api.routes import auth, me, permission, user, role, otp
 from app.core.logging import log_request, setup_logger
 from app.core.init_db import init_db
 from app.core.config import settings
@@ -32,9 +32,12 @@ async def startup_db_client():
     logger.info("Database initialization completed")
 
 # Include API routers
+app.include_router(auth.router)
+app.include_router(me.router)
 app.include_router(user.router)
 app.include_router(role.router)
 app.include_router(permission.router)
+app.include_router(otp.router)
 
 @app.get("/")
 def read_root():
