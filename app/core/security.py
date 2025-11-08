@@ -21,7 +21,7 @@ SCOPES = permissions_data.get("scopes", {})
 
 # Update OAuth2 scheme to support scopes loaded from JSON
 oauth2_scheme = OAuth2PasswordBearer(
-    tokenUrl="users/login",
+    tokenUrl="auth/login",
     scopes=SCOPES
 )
 
