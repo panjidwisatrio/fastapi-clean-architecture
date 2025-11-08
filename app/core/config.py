@@ -26,7 +26,24 @@ class Settings(BaseSettings):
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    ACCEPTED_EMAIL_DOMAINS: str = "global.ntt,ntt.com,nttdata.com"
     DATABASE_URL: str
+    
+    # Frontend Configuration (Frontend URL, Endpoints, etc.)
+    APP_URL: str = "http://localhost:5000"
+    RESET_PASSWORD_ENDPOINT: str = "/users/reset-password"
+    
+    # Gmail SMTP Configuration
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USER: str
+    SMTP_PASSWORD: str
+    SMTP_FROM_EMAIL: str
+    SMTP_FROM_NAME: str = "Your App"
+    
+    # OTP Configuration
+    OTP_EXPIRE_MINUTES: int = 5
+    OTP_LENGTH: int = 6
 
     class Config:
         env_file = ".env"
@@ -45,6 +62,10 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.ENVIRONMENT.lower() == "production"
+
+    @property
+    def accepted_email_domains(self) -> list[str]:
+        return [domain.strip() for domain in self.ACCEPTED_EMAIL_DOMAINS.split(",")]
 
 
 @lru_cache()
