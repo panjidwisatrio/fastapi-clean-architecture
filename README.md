@@ -15,8 +15,12 @@ A modern, production-ready web application template built with FastAPI following
 - [Testing](#-testing)
 - [Troubleshooting](#-troubleshooting)
 - [Production Deployment](#-production-deployment)
+- [Code Generation (CLI Tool)](#-code-generation-cli-tool)
 - [Contributing](#-contributing)
 - [License](#-license)
+- [Acknowledgements](#-acknowledgements)
+- [Support](#-support)
+- [Roadmap](#-roadmap)
 
 ## ✨ Features
 
@@ -1021,6 +1025,296 @@ docker run -p 8000:8000 --env-file .env.production fastapi-app
 - [ ] Enable database migrations
 - [ ] Configure CDN for static files (if any)
 
+## 🤖 Code Generation (CLI Tool)
+
+This project includes a powerful CLI tool to automate the creation of boilerplate code, similar to Laravel's artisan commands. You can generate models, schemas, repositories, services, routes, and complete CRUD operations with a single command.
+
+### Installation
+
+The generator tool is already included in the `module/` directory. Install the required dependency:
+
+```bash
+pip install inflect
+```
+
+### Usage
+
+Navigate to the project root and use the generator:
+
+```bash
+python module/generate.py <command> <name> [options]
+```
+
+### Available Commands
+
+| Command | Description |
+|---------|-------------|
+| `model` | Generate SQLAlchemy model |
+| `schema` | Generate Pydantic schemas (Create, Update, InDB) |
+| `repository` | Generate repository with CRUD methods |
+| `service` | Generate service layer with business logic |
+| `route` | Generate API routes with all CRUD endpoints |
+| `crud` | Generate all of the above in one command |
+
+### Examples
+
+#### 1. Generate Complete CRUD for Product
+
+```bash
+python module/generate.py crud Product --fields "name:str,price:float,description:text,stock:int"
+```
+
+This will create:
+
+- `app/models/product.py` - SQLAlchemy model
+- `app/schemas/product.py` - Pydantic schemas
+- `app/repositories/product_repository.py` - Data access layer
+- `app/services/product_service.py` - Business logic layer
+- `app/api/routes/product.py` - API endpoints
+
+#### 2. Generate Only Model
+
+```bash
+python module/generate.py model Product --fields "name:str,price:float,stock:int"
+```
+
+#### 3. Generate Only Service
+
+```bash
+python module/generate.py service Product
+```
+
+#### 4. Generate Only Routes
+
+```bash
+python module/generate.py route Product
+```
+
+### Supported Field Types
+
+| Type | SQLAlchemy Column | Pydantic Type |
+|------|------------------|---------------|
+| `str`, `string` | `String` | `str` |
+| `int`, `integer` | `Integer` | `int` |
+| `float` | `Float` | `float` |
+| `bool`, `boolean` | `Boolean` | `bool` |
+| `datetime` | `DateTime` | `datetime` |
+| `date` | `Date` | `date` |
+| `text` | `Text` | `str` |
+
+### After Generation
+
+After running the generator, you need to complete these manual steps:
+
+#### 1. Add Dependency Injection
+
+Add to `app/api/dependencies.py`:
+
+```python
+from app.services.product_service import ProductService
+from app.repositories.product_repository import ProductRepository
+
+def get_product_service(db: Session = Depends(get_db)) -> ProductService:
+    """Returns a ProductService instance with its required repository"""
+    return ProductService(ProductRepository(db))
+```
+
+#### 2. Register Router
+
+Add to `app/main.py`:
+
+```python
+from app.api.routes import product
+
+app.include_router(product.router)
+```
+
+#### 3. Add Permissions
+
+Add to `app/data/permissions.json`:
+
+```json
+{
+  "scopes": {
+    "create_product": "Create new product",
+    "read_products": "Read all products",
+    "read_product": "Read product details",
+    "update_product": "Update product",
+    "delete_product": "Delete product"
+  },
+  "roles": {
+    "Admin": {
+      "description": "Admin role",
+      "permissions": [
+        "create_product",
+        "read_products",
+        "read_product",
+        "update_product",
+        "delete_product"
+      ]
+    }
+  }
+}
+```
+
+#### 4. Run Database Migration
+
+Restart the application to create the new table:
+
+```bash
+uvicorn app.main:app --reload
+```
+
+### What Gets Generated
+
+#### Model (`app/models/product.py`)
+
+```python
+from sqlalchemy import Column, Integer, String, Float, Text
+from sqlalchemy.sql import func
+from app.core.database import Base
+
+class Product(Base):
+    __tablename__ = "products"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String)
+    price = Column(Float)
+    description = Column(Text)
+    stock = Column(Integer)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+```
+
+#### Schema (`app/schemas/product.py`)
+
+```python
+from pydantic import BaseModel
+from datetime import datetime
+from typing import Optional
+
+class ProductBase(BaseModel):
+    name: str
+    price: float
+    description: str
+    stock: int
+
+class ProductCreate(ProductBase):
+    pass
+
+class ProductUpdate(BaseModel):
+    name: Optional[str] = None
+    price: Optional[float] = None
+    description: Optional[str] = None
+    stock: Optional[int] = None
+
+class ProductInDB(ProductBase):
+    id: int
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    
+    class Config:
+        orm_mode = True
+```
+
+#### Repository (`app/repositories/product_repository.py`)
+
+- `get_product(id)` - Get by ID
+- `get_products(skip, limit)` - Get all with pagination
+- `create_product(data)` - Create new
+- `update_product(id, data)` - Update existing
+- `delete_product(id)` - Delete by ID
+
+#### Service (`app/services/product_service.py`)
+
+- Business logic layer
+- Error handling with HTTP exceptions
+- Logging decorators
+- Input validation
+
+#### Routes (`app/api/routes/product.py`)
+
+- `POST /products` - Create product
+- `GET /products` - List all products
+- `GET /products/{id}` - Get product by ID
+- `PUT /products/{id}` - Update product
+- `DELETE /products/{id}` - Delete product
+
+All routes include:
+
+- ✅ Permission checks
+- ✅ Dependency injection
+- ✅ Request/response validation
+- ✅ Proper HTTP status codes
+- ✅ API documentation
+
+### Advanced Usage
+
+#### Generate with Complex Fields
+
+```bash
+python module/generate.py crud Order --fields "user_id:int,total_amount:float,status:str,is_paid:bool,order_date:datetime"
+```
+
+#### Generate Without Fields (Manual Definition)
+
+```bash
+python module/generate.py crud Product
+```
+
+Then manually edit the generated files to add your custom fields and logic.
+
+#### Customize Generated Code
+
+After generation, you can customize:
+
+- Add relationships in models
+- Add custom validation in schemas
+- Add business logic in services
+- Add custom queries in repositories
+- Add custom endpoints in routes
+
+### Benefits of Code Generation
+
+✅ **Fast Development**: Generate complete CRUD in seconds  
+✅ **Consistency**: All code follows the same pattern  
+✅ **Clean Architecture**: Maintains separation of concerns  
+✅ **Best Practices**: Includes logging, error handling, and validation  
+✅ **DRY Principle**: No copy-paste, no repetition  
+✅ **Production Ready**: Generated code is ready to use  
+✅ **Customizable**: Easy to modify after generation  
+
+### Tips
+
+1. **Always review generated code** before committing
+2. **Add custom business logic** in the service layer
+3. **Add relationships** in models after generation
+4. **Customize validation** in schemas as needed
+5. **Add indexes** to frequently queried columns
+6. **Test your endpoints** using Swagger UI
+
+### Example Workflow
+
+```bash
+# 1. Generate CRUD
+python module/generate.py crud Product --fields "name:str,price:float,stock:int"
+
+# 2. Add dependency injection (manual)
+# Edit app/api/dependencies.py
+
+# 3. Register router (manual)
+# Edit app/main.py
+
+# 4. Add permissions (manual)
+# Edit app/data/permissions.json
+
+# 5. Restart application
+uvicorn app.main:app --reload
+
+# 6. Test in Swagger UI
+# Visit http://localhost:8000/docs
+```
+
 ## 🤝 Contributing
 
 Contributions are welcome! Please follow these steps:
@@ -1061,6 +1355,7 @@ If you have any questions or need help, please:
 
 ## 🗺️ Roadmap
 
+- [x] ✨ CLI code generator for CRUD operations
 - [ ] Add database migrations with Alembic
 - [ ] Implement API versioning
 - [ ] Add comprehensive test suite
@@ -1072,7 +1367,9 @@ If you have any questions or need help, please:
 - [ ] Add GraphQL support
 - [ ] Add Docker Compose setup
 - [ ] Add CI/CD pipeline examples
+- [ ] Add test generation in CLI tool
+- [ ] Add migration generation in CLI tool
 
 ---
 
-**Made with ❤️ using FastAPI and Clean Architecture principles**
+Made with ❤️ using FastAPI and Clean Architecture principles
