@@ -52,12 +52,15 @@ def init_db(logger):
                     logger.info(f"Added permission {perm_name} to role {role_name}")
         
         # Create a super admin user if it doesn't exist
-        super_admin = db.query(User).filter(User.email == "admin@example.com").first()
-        if not super_admin:
-            super_admin_role = role_objects.get("Super Admin")
-            if super_admin_role:
+        super_admin_role = role_objects.get("Super Admin")
+        if super_admin_role:
+            # Check if any super admin user already exists
+            existing_super_admin = db.query(User).filter(User.role_id == super_admin_role.id).first()
+            
+            if not existing_super_admin:
                 with open(os.path.join("app", "data", "initial_data.json")) as f:
                     super_admin_data = json.load(f)["super_admin"]
+                    
                     super_admin = User(
                         role_id=super_admin_role.id,
                         first_name=super_admin_data["first_name"],
@@ -69,6 +72,9 @@ def init_db(logger):
                     )
                     db.add(super_admin)
                     logger.info(f"Created super admin user: {super_admin_data['email']}")
+            else:
+                logger.info(f"Super admin user already exists: {existing_super_admin.email}")
+        
         db.commit()
         
     except Exception as e:
