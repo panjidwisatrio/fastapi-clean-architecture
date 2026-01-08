@@ -1,0 +1,38 @@
+/* Custom styles for FastAPI Clean Architecture documentation */
+
+:root {
+  --md-primary-fg-color: #4F46E5;
+  --md-accent-fg-color: #6366F1;
+}
+
+/* Code block improvements */
+.md-typeset code {
+  background-color: rgba(79, 70, 229, 0.1);
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+}
+
+/* Admonition custom colors */
+.md-typeset .admonition.note {
+  border-color: #6366F1;
+}
+
+.md-typeset .admonition.tip {
+  border-color: #10B981;
+}
+
+.md-typeset .admonition.warning {
+  border-color: #F59E0B;
+}
+
+.md-typeset .admonition.danger {
+  border-color: #EF4444;
+}
+
+.text-center {
+    text-align: center;
+}
+
+.text-center p {
+    text-align: center;
+}
