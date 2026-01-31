@@ -1,12 +1,12 @@
 from fastapi import APIRouter, Depends, status
 from typing import List
 
+from app.core.security import get_current_user_with_permission
 from app.schemas.permission import Permission, PermissionCreate
 from app.services.permission_service import PermissionService
 from app.api.dependencies import (
     get_permission_service, 
-    get_pagination_params,
-    get_current_user_with_permission
+    get_pagination_params
 )
 
 router = APIRouter(prefix="/permissions", tags=["permissions"])

@@ -11,6 +11,13 @@ class RoleBase(BaseModel):
 class RoleCreate(RoleBase):
     pass
 
+class RoleUpdate(RoleBase):
+    pass
+
+class PermissionRole(BaseModel):
+    role_id: int
+    permission_ids: List[int]
+
 class Role(RoleBase):
     id: int
     created_at: datetime

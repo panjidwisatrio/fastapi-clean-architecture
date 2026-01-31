@@ -45,11 +45,11 @@ def get_auth_service(
 
 def get_role_service(db: Session = Depends(get_db)) -> RoleService:
     """Returns a RoleService instance with its required repositories"""
-    return RoleService(RoleRepository(db), PermissionRepository(db))
+    return RoleService(db=db)
 
 def get_permission_service(db: Session = Depends(get_db)) -> PermissionService:
     """Returns a PermissionService instance with its required repository"""
-    return PermissionService(PermissionRepository(db))
+    return PermissionService(db=db)
 
 # Pagination dependencies
 def get_pagination_params(skip: int = 0, limit: int = 100) -> Tuple[int, int]:

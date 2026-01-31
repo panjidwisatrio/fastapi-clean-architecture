@@ -1,12 +1,12 @@
 from fastapi import APIRouter, Depends, status
 from typing import List
 
-from app.schemas.role import Role, RoleCreate
+from app.core.security import get_current_user_with_permission
+from app.schemas.role import PermissionRole, Role, RoleCreate, RoleUpdate
 from app.services.role_service import RoleService
 from app.api.dependencies import (
     get_role_service,
     get_pagination_params,
-    get_current_user_with_permission
 )
 
 router = APIRouter(prefix="/roles", tags=["roles"])
@@ -18,6 +18,15 @@ async def create_role(
     _: dict = Depends(get_current_user_with_permission("manage_roles"))
 ):
     return service.create_role(role)
+
+@router.put("/{role_id}", response_model=Role)
+async def update_role(
+    role_id: int,
+    role: RoleUpdate,
+    service: RoleService = Depends(get_role_service),
+    _: dict = Depends(get_current_user_with_permission("manage_roles"))
+):
+    return service.update_role(role_id, role)
 
 @router.get("/", response_model=List[Role])
 async def read_roles(
@@ -45,20 +54,18 @@ async def delete_role(
     service.delete_role(role_id)
     return None
 
-@router.post("/{role_id}/permissions/{permission_id}", response_model=Role)
+@router.post("/permissions", response_model=Role)
 async def add_permission_to_role(
-    role_id: int,
-    permission_id: int,
+    permissions: PermissionRole,
     service: RoleService = Depends(get_role_service),
     _: dict = Depends(get_current_user_with_permission("manage_roles"))
 ):
-    return service.add_permission_to_role(role_id, permission_id)
+    return service.add_permission_to_role(permissions)
 
-@router.delete("/{role_id}/permissions/{permission_id}", response_model=Role)
+@router.delete("/permissions", response_model=Role)
 async def remove_permission_from_role(
-    role_id: int,
-    permission_id: int,
+    permissions: PermissionRole,
     service: RoleService = Depends(get_role_service),
     _: dict = Depends(get_current_user_with_permission("manage_roles"))
 ):
-    return service.remove_permission_from_role(role_id, permission_id)
+    return service.remove_permission_from_role(permissions)
