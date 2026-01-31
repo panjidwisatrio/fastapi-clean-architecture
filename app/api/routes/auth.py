@@ -1,17 +1,16 @@
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Header, status
+from fastapi import APIRouter, Depends, HTTPException, Header, Request, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 
-from app.api.dependencies import get_auth_service, get_otp_service
+from app.api.dependencies import get_auth_service
 from app.core.security import get_current_user
 from app.models.user import User
-from app.schemas.user import User as UserSchema
-from app.schemas.auth import ForgotPasswordRequest, ForgotPasswordResponse, UserRegister
+from app.schemas.user import PasswordUpdate, User as UserSchema
+from app.schemas.auth import AuthResponseBase, ForgotPasswordRequest, ForgotPasswordResponse, ResendVerificationOTPRequest, UserRegister, VerifyEmailRequest
 from app.schemas.token import Token
 from app.services.auth_service import AuthService
-from app.services.otp_service import OTPService
 
 
 logger = logging.getLogger(__name__)
@@ -24,20 +23,39 @@ async def register_user(user: UserRegister, service: AuthService = Depends(get_a
 
 @router.post("/login", response_model=Token)
 def login(
+    response: Response,
     form_data: OAuth2PasswordRequestForm = Depends(),
     service: AuthService = Depends(get_auth_service)
 ):
-    user = service.authenticate_user(form_data.username, form_data.password)
-    if not user:
+    access_token, refresh_token, expires_in, max_age = service.authenticate_user(form_data.username, form_data.password)
+    response.set_cookie(
+        key="refresh_token", 
+        value=refresh_token, 
+        httponly=True, # Mitigates XSS attacks
+        secure=True, # Ensures cookie is sent over HTTPS only
+        samesite=None, # Adjust based on your cross-site requirements; 'Lax' or 'Strict' can be used; None allows cross-site;
+        max_age=max_age,
+        path="/auth/refresh-token"
+    )
+    return {"access_token": access_token, "token_type": "bearer", "expires_in": expires_in}
+
+@router.post("/refresh-token", response_model=Token)
+async def refresh_token(
+    request: Request,
+    service: AuthService = Depends(get_auth_service)
+):
+    refresh_token = request.cookies.get("refresh_token")
+    if not refresh_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
+            detail="Refresh token missing",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    access_token = service.create_access_token(user)
-    return {"access_token": access_token, "token_type": "bearer"}
+        
+    access_token, expires_in = service.refresh_access_token(refresh_token)
+    return {"access_token": access_token, "token_type": "bearer", "expires_in": expires_in}
 
-@router.post("/logout", status_code=status.HTTP_200_OK)
+@router.post("/logout", status_code=status.HTTP_200_OK, response_model=AuthResponseBase)
 async def logout(
     authorization: str = Header(default=None),
     current_user: User = Depends(get_current_user),
@@ -69,7 +87,7 @@ async def logout(
     description="Send password reset email with OTP link"
 )
 async def forgot_password(
-    request: ForgotPasswordRequest,
+    forgot_password_request: ForgotPasswordRequest,
     auth_service: AuthService = Depends(get_auth_service)
 ):
     """
@@ -78,10 +96,10 @@ async def forgot_password(
     - **email**: User's email address
     """
     try:
-        response = await auth_service.forgot_password(email=request.email)
+        response = await auth_service.forgot_password(forgot_password_request=forgot_password_request)
         return ForgotPasswordResponse(
             message=response["message"],
-            email=request.email
+            expires_in=response["expires_in"]
         )
     except HTTPException:
         raise
@@ -92,28 +110,91 @@ async def forgot_password(
             detail="Failed to process forgot password request"
         )
 
-@router.get("/verify-forgot-password-otp", status_code=status.HTTP_200_OK)
-async def verify_forgot_password_otp(
-    otp: str = Header(default=None),
-    otp_service: OTPService = Depends(get_otp_service),
+@router.get("/verify-reset-password", status_code=status.HTTP_200_OK, response_model=AuthResponseBase)
+async def verify_reset_password(
+    token: str = Header(default=None),
+    auth_service: AuthService = Depends(get_auth_service),
 ):
     """
     Verify if the provided OTP is valid and not blacklisted.
     """
     try:
-        is_valid, message = otp_service.verify_otp(otp)
-        if not is_valid:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=message
-            )
-        
-        return {"is_valid": is_valid, "message": message}
+        _ = await auth_service.verify_reset_password(token=token)
+        return {"message": "OTP is valid"}
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error verifying OTP: {str(e)}")
+        logger.error(f"Error verifying forgot password OTP: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to verify OTP"
+        )
+        
+@router.post("/verify-email", status_code=status.HTTP_200_OK, response_model=AuthResponseBase)
+async def verify_email(
+    verify_request: VerifyEmailRequest,
+    auth_service: AuthService = Depends(get_auth_service)
+):
+    """
+    Verify user's email using OTP code
+    
+    - **email**: User's email address
+    - **otp_code**: OTP code sent to user's email
+    """
+    try:
+        _ = await auth_service.verify_email(verify_request)
+        return {"message": "Email verified successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error verifying email: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to verify email"
+        )
+
+@router.post("/resend-verification-otp", status_code=status.HTTP_200_OK, response_model=AuthResponseBase)
+async def resend_verification_otp(
+    resend_request: ResendVerificationOTPRequest,
+    auth_service: AuthService = Depends(get_auth_service)
+):
+    """
+    Resend verification OTP to user's email
+    
+    - **email**: User's email address
+    """
+    try:
+        _ = await auth_service.resend_verification_otp(resend_request=resend_request)
+        return {"message": "Verification OTP resent successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error resending verification OTP: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to resend verification OTP"
+        )
+        
+@router.post("/reset-password", status_code=status.HTTP_200_OK, response_model=AuthResponseBase)
+async def reset_password(
+    request: PasswordUpdate,
+    token: str = Header(default=None),
+    auth_service: AuthService = Depends(get_auth_service)
+):
+    """
+    Reset user's password using OTP token
+    
+    - **token**: OTP token sent to user's email
+    - **new_password**: New password to set
+    """
+    try:
+        _ = await auth_service.reset_password(token=token, updated_password=request)
+        return {"message": "Password reset successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error resetting password: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to reset password"
         )

@@ -39,13 +39,11 @@ def get_token_blacklist_service(db: Session = Depends(get_db)) -> TokenBlacklist
     return TokenBlacklistService(TokenBlacklistRepository(db))
 
 def get_auth_service(
-    user_service: UserService = Depends(get_user_service),
+    db: Session = Depends(get_db),
     email_service: EmailService = Depends(get_email_service),
-    otp_service: OTPService = Depends(get_otp_service),
-    blacklist_service: TokenBlacklistService = Depends(get_token_blacklist_service)
 ) -> AuthService:
     """Returns an AuthService instance with its required repositories"""
-    return AuthService(user_service, email_service, otp_service, blacklist_service)
+    return AuthService(db=db, email_service=email_service)
 
 def get_role_service(db: Session = Depends(get_db)) -> RoleService:
     """Returns a RoleService instance with its required repositories"""
@@ -59,20 +57,3 @@ def get_permission_service(db: Session = Depends(get_db)) -> PermissionService:
 def get_pagination_params(skip: int = 0, limit: int = 100) -> Tuple[int, int]:
     """Returns standardized pagination parameters"""
     return skip, limit
-
-# Security-related dependencies
-def get_current_admin_user(
-    current_user: User = Security(get_current_user, scopes=["admin_access"])
-) -> User:
-    """Dependency that ensures the current user has admin access"""
-    return current_user
-
-def get_current_user_with_permission(required_permission: str):
-    """Factory for creating dependencies that check for specific permissions"""
-    
-    async def _get_user_with_permission(
-        current_user: User = Security(get_current_user, scopes=[required_permission])
-    ) -> User:
-        return current_user
-        
-    return _get_user_with_permission
