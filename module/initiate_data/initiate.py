@@ -80,6 +80,7 @@ def initiate_permissions(project_root: Path):
             "roles": {
                 "Super Admin": {
                     "description": "Super Admin has all permissions",
+                    "is_default": False,
                     "permissions": [
                         "manage_permissions",
                         "view_permissions",
@@ -94,6 +95,7 @@ def initiate_permissions(project_root: Path):
                 },
                 "Admin": {
                     "description": "Admin can manage users and view data",
+                    "is_default": False,
                     "permissions": [
                         "create_user",
                         "get_users",
@@ -104,6 +106,7 @@ def initiate_permissions(project_root: Path):
                 },
                 "User": {
                     "description": "Regular user with basic permissions",
+                    "is_default": True,
                     "permissions": []
                 }
             }
