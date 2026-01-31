@@ -13,16 +13,16 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    role_id = Column(Integer, ForeignKey("roles.id"))
-    first_name = Column(String)
-    last_name = Column(String)
-    email = Column(String, unique=True, index=True)
-    hashed_password = Column(String)
-    is_verified = Column(Boolean, default=False)
-    is_active = Column(Boolean, default=True)
-    last_active = Column(DateTime(timezone=True), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    role_id = Column(Integer, ForeignKey("roles.id"), index=True, nullable=False)
+    first_name = Column(String, index=True, nullable=True)
+    last_name = Column(String, index=True, nullable=True)
+    email = Column(String, unique=True, index=True, nullable=False)
+    hashed_password = Column(String, nullable=False)
+    is_verified = Column(Boolean, default=False, index=True, nullable=False)
+    is_active = Column(Boolean, default=True, index=True, nullable=False)
+    last_active = Column(DateTime(timezone=True), index=True, nullable=True)
+    created_at = Column(DateTime(timezone=True), index=True, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), index=True, onupdate=func.now())
 
     role = relationship("Role", back_populates="users")
     otps = relationship("OTP", back_populates="user", cascade="all, delete-orphan")
@@ -31,6 +31,8 @@ class User(Base):
     @log_operation(logger)
     def validate_email_domain(email: str) -> bool:
         """Validate if the email domain is accepted."""
+        if settings.accepted_email_domains == ["*"]:
+            return True
         return email.split("@")[-1] in settings.accepted_email_domains
 
     @staticmethod

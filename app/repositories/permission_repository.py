@@ -1,3 +1,4 @@
+from typing import List
 from sqlalchemy.orm import Session
 from app.core.logging import setup_logger, log_operation
 from app.models.permission import Permission
@@ -36,3 +37,8 @@ class PermissionRepository:
             self.db.delete(db_permission)
             self.db.commit()
         return db_permission
+    
+    @log_operation(logger)
+    def validate_permissions_exist(self, permission_ids: List[int]) -> bool:
+        existing_permissions = self.db.query(Permission).filter(Permission.id.in_(permission_ids)).all()
+        return len(existing_permissions) == len(permission_ids)

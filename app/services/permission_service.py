@@ -1,4 +1,5 @@
 from fastapi import HTTPException, status
+from sqlalchemy.orm import Session
 from app.core.logging import setup_logger, log_operation
 from app.repositories.permission_repository import PermissionRepository
 from app.schemas.permission import PermissionCreate, Permission
@@ -6,8 +7,8 @@ from app.schemas.permission import PermissionCreate, Permission
 logger = setup_logger("permission_services")
 
 class PermissionService:
-    def __init__(self, permission_repository: PermissionRepository):
-        self.permission_repository = permission_repository
+    def __init__(self, db: Session):
+        self.permission_repository = PermissionRepository(db)
 
     @log_operation(logger)
     def create_permission(self, permission: PermissionCreate) -> Permission:

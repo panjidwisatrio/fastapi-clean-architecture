@@ -1,15 +1,21 @@
-import json
-import os
-from app.core.database import engine, Base, SessionLocal
-from app.models.user import User
-from app.models.role import Role
-from app.models.permission import Permission
-from app.models.permission_role import PermissionRole
-from app.core.utils import get_password_hash, load_permissions
+from app.core.database import engine, Base
 
-def init_db(logger):
-    # Create tables
+def create_tables():
+    """Create all tables in the database."""
+    import app.models
+    
     Base.metadata.create_all(bind=engine)
+    
+def initiate_data(logger):
+    """Initialize database with default roles, permissions, and a super admin user."""
+    import json
+    import os
+    from app.core.database import SessionLocal
+    from app.models.user import User
+    from app.models.role import Role
+    from app.models.permission import Permission
+    from app.models.permission_role import PermissionRole
+    from app.core.utils import get_password_hash, load_permissions
     
     db = SessionLocal()
     try:
@@ -83,3 +89,12 @@ def init_db(logger):
         raise
     finally:
         db.close()
+
+def init_db(logger):
+    # Create tables
+    create_tables()
+    
+    # Initiate data
+    initiate_data(logger)
+    
+    

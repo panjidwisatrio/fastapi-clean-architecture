@@ -29,16 +29,16 @@ class OTPRepository:
         return otp
     
     @log_operation(logger)
-    def get_valid_otp(self, email: str, code: str, type: OTPType) -> Optional[OTP]:
+    def get_valid_otp(self, email: str, code: str, otp_type: OTPType) -> Optional[OTP]:
         """Get valid OTP that is not used and not expired"""
         now = get_current_utc_time()
         return self.db.query(OTP).filter(
             and_(
                 OTP.email == email,
                 OTP.code == code,
-                OTP.type == type,
+                OTP.type == otp_type,
                 OTP.is_used == 0,
-                OTP.expires_at > now
+                OTP.expires_at > get_current_utc_time()
             )
         ).first()
 

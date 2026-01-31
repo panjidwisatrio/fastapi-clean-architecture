@@ -1,3 +1,4 @@
+"""Singleton configuration module using Pydantic BaseSettings."""
 import os
 import re
 from pydantic import BaseSettings
@@ -26,7 +27,9 @@ class Settings(BaseSettings):
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-    ACCEPTED_EMAIL_DOMAINS: str = "global.ntt,ntt.com,nttdata.com"
+    ACCESS_TOKEN_RESET_PASSWORD_EXPIRE_MINUTES: int = 15
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    ACCEPTED_EMAIL_DOMAINS: str = "*"
     DATABASE_URL: str
     
     # Frontend Configuration (Frontend URL, Endpoints, etc.)

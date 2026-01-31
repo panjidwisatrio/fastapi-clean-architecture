@@ -1,8 +1,9 @@
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from jose import JWTError, jwt
+from app.core.logging import setup_logger
 from app.core.utils import get_current_utc_time, load_permissions
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Security, status
 from fastapi.security import OAuth2PasswordBearer, SecurityScopes
 from sqlalchemy.orm import Session
 from app.core.database import get_db
@@ -26,18 +27,71 @@ oauth2_scheme = OAuth2PasswordBearer(
     scopes=SCOPES
 )
 
+logger = setup_logger("security")
+
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
     if expires_delta:
         expire = get_current_utc_time() + expires_delta
+        expires_in = int(expires_delta.total_seconds())
     else:
         expire = get_current_utc_time() + timedelta(minutes=15)
+        expires_in = int(timedelta(minutes=15).total_seconds())
     to_encode.update({"exp": expire})
     # Ensure subject is a string
     if "sub" in to_encode:
         to_encode["sub"] = str(to_encode["sub"])
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+    return encoded_jwt, expires_in
+
+def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+    to_encode = data.copy()
+    if expires_delta:
+        expire = get_current_utc_time() + expires_delta
+        max_age = int(expires_delta.total_seconds())
+    else:
+        expire = get_current_utc_time() + timedelta(days=7)
+        max_age = int(timedelta(days=7).total_seconds())
+    to_encode.update({"exp": expire})
+    # Ensure subject is a string
+    if "sub" in to_encode:
+        to_encode["sub"] = str(to_encode["sub"])
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt, max_age
+
+def decode_token(token: str) -> dict:
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        
+        exp = payload.get("exp")
+        if not exp:
+            logger.warning("Token has no expiration")
+            raise JWTError("Token has no expiration")
+        
+        payload_exp = datetime.fromtimestamp(exp, tz=timezone.utc)
+        if payload_exp < get_current_utc_time():
+            logger.warning("Token has expired")
+            raise JWTError("Token has expired")
+        
+        payload["exp"] = payload_exp
+        
+        return payload
+    except JWTError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from e
+
+def get_current_user_with_permission(required_permission: str):
+    """Factory for creating dependencies that check for specific permissions"""
+    
+    async def _get_user_with_permission(
+        current_user: User = Security(get_current_user, scopes=[required_permission])
+    ) -> User:
+        return current_user
+        
+    return _get_user_with_permission
 
 async def get_current_user(
     security_scopes: SecurityScopes,

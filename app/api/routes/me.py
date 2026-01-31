@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, status
 
 from app.core.security import get_current_user
-from app.schemas.user import PasswordUpdate, User, UserUpdate
+from app.schemas.user import MeUpdate, PasswordUpdate, User, UserUpdate
 from app.api.dependencies import get_user_service
 from app.services.user_service import UserService
 
@@ -13,7 +13,7 @@ async def read_users_me(current_user: User = Depends(get_current_user)):
 
 @router.put("/", response_model=User)
 async def update_user_me(
-    user: UserUpdate,
+    user: MeUpdate,
     current_user: User = Depends(get_current_user),
     service: UserService = Depends(get_user_service)
 ):
@@ -33,4 +33,4 @@ async def deactivate_user_me(
     service: UserService = Depends(get_user_service)
 ):
     service.deactivate_user(current_user.id)
-    return None
+    return {"message": "User deactivated successfully"}

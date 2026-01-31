@@ -3,7 +3,7 @@ from typing import Optional, Union
 from sqlalchemy.orm import Session
 from app.core.logging import setup_logger, log_operation
 from app.models.user import User
-from app.schemas.user import UserCreate, UserUpdate
+from app.schemas.user import MeUpdate, UserCreate, UserUpdate
 from app.schemas.auth import UserRegister
 from app.core.utils import get_current_utc_time, get_password_hash
 
@@ -56,7 +56,7 @@ class UserRepository:
         return db_user
 
     @log_operation(logger)
-    def update_user(self, user: UserUpdate, user_id: Optional[int] = None, email: Optional[str] = None) -> User:
+    def update_user(self, user: Union[UserUpdate, MeUpdate], user_id: Optional[int] = None, email: Optional[str] = None) -> User:
         db_user = self.get_user(user_id) if user_id else self.get_user_by_email(email)
         if db_user:
             update_data = user.dict(exclude_unset=True)
@@ -73,6 +73,13 @@ class UserRepository:
         return db_user
 
     @log_operation(logger)
+    def update_users_role(self, old_role_id: int, new_role_id: int) -> int:
+        """Update all users with old_role_id to new_role_id. Returns number of affected users."""
+        affected_rows = self.db.query(User).filter(User.role_id == old_role_id).update({"role_id": new_role_id})
+        self.db.commit()
+        return affected_rows
+
+    @log_operation(logger)
     def deactivate_user(self, user_id: int) -> User:
         db_user = self.get_user(user_id)
         if db_user:
@@ -81,10 +88,19 @@ class UserRepository:
         return db_user
         
     @log_operation(logger)
-    def update_last_active(self, user_id: int) -> User:
-        db_user = self.get_user(user_id)
+    def update_last_active(self, user_id: Optional[int] = None, email: Optional[str] = None) -> User:
+        db_user = self.get_user(user_id) if user_id else self.get_user_by_email(email)
         if db_user:
             db_user.last_active = get_current_utc_time()
+            self.db.commit()
+            self.db.refresh(db_user)
+        return db_user
+    
+    @log_operation(logger)
+    def verify_user(self, email: str) -> User:
+        db_user = self.get_user_by_email(email)
+        if db_user and not db_user.is_verified:
+            db_user.is_verified = True
             self.db.commit()
             self.db.refresh(db_user)
         return db_user

@@ -14,7 +14,6 @@ logger = setup_logger("otp_model")
 
 class OTPType(str, enum.Enum):
     REGISTER = "register"
-    RESET_PASSWORD = "reset_password"
 
 
 class OTP(Base):
@@ -25,9 +24,9 @@ class OTP(Base):
     email = Column(String(255), nullable=False, index=True)
     code = Column(String(6), nullable=False)
     type = Column(SQLEnum(OTPType), nullable=False)
-    is_used = Column(Integer, default=0)  # 0: not used, 1: used
-    expires_at = Column(DateTime, nullable=False)
-    created_at = Column(DateTime, default=get_current_utc_time())
+    is_used = Column(Integer, index=True, default=0)  # 0: not used, 1: used
+    expires_at = Column(DateTime, index=True, nullable=False)
+    created_at = Column(DateTime, index=True, default=get_current_utc_time())
     
     # Relationship
     user = relationship("User", back_populates="otps")

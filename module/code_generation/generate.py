@@ -17,12 +17,17 @@ Examples:
   python generate.py crud Product --fields "name:str,price:float,description:str"
 """
 
-import os
-import sys
 import argparse
 from pathlib import Path
 from typing import List, Dict
 import inflect
+
+try:
+    from ..util import find_project_root
+except ImportError:
+    project_root_path = Path(__file__).parent.parent.parent
+    sys.path.append(str(project_root_path))
+    from module.util import find_project_root
 
 p = inflect.engine()
 
@@ -377,7 +382,7 @@ app.include_router({self.snake_name}.router)
 
     def write_file(self, path: str, content: str):
         """Write content to file"""
-        file_path = Path(path)
+        file_path = find_project_root() / Path(path)
         file_path.parent.mkdir(parents=True, exist_ok=True)
         
         with open(file_path, 'w', encoding='utf-8') as f:

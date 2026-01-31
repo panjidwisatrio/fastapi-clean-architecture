@@ -7,10 +7,10 @@ class Role(Base):
     __tablename__ = "roles"
 
     id = Column(Integer, primary_key=True, index=True)
-    role_name = Column(String, unique=True)
-    description = Column(String)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    role_name = Column(String, unique=True, index=True, nullable=False)
+    description = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), index=True, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), index=True, onupdate=func.now())
 
     users = relationship("User", back_populates="role")
     permissions = relationship("Permission", secondary="permission_roles", back_populates="roles")
