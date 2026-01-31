@@ -1,13 +1,8 @@
-from fastapi import Depends, Security
+from fastapi import Depends
 from sqlalchemy.orm import Session
 from typing import Tuple
 
 from app.core.database import get_db
-from app.core.security import get_current_user
-from app.repositories.token_blacklist_repository import TokenBlacklistRepository
-from app.repositories.user_repository import UserRepository
-from app.repositories.role_repository import RoleRepository
-from app.repositories.permission_repository import PermissionRepository
 from app.services.auth_service import AuthService
 from app.services.email_service import EmailService
 from app.services.otp_service import OTPService
@@ -15,7 +10,6 @@ from app.services.token_blacklist_service import TokenBlacklistService
 from app.services.user_service import UserService
 from app.services.role_service import RoleService
 from app.services.permission_service import PermissionService
-from app.schemas.user import User
 
 # External service dependencies
 def get_email_service() -> EmailService:
