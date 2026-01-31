@@ -27,12 +27,10 @@ def get_user_service(db: Session = Depends(get_db), email_service: EmailService 
     return UserService(UserRepository(db), email_service=email_service)
 
 def get_otp_service(
-    db: Session = Depends(get_db), 
-    user_service: UserService = Depends(get_user_service), 
-    email_service: EmailService = Depends(get_email_service)
+    db: Session = Depends(get_db),
 ) -> OTPService:
     """Returns an OTPService instance with its required repository"""
-    return OTPService(db, user_service=user_service, email_service=email_service)
+    return OTPService(db=db)
 
 def get_token_blacklist_service(db: Session = Depends(get_db)) -> TokenBlacklistService:
     """Returns a TokenBlacklistService instance with its required repository"""
