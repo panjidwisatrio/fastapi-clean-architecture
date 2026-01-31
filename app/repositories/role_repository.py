@@ -118,3 +118,19 @@ class RoleRepository:
         self.db.commit()
         
         return db_role
+    
+    @log_operation(logger)
+    def set_role_as_default(self, role_id: int) -> Role:
+        # Unset previous default role
+        self.db.query(Role).filter(Role.is_default == 1).update({"is_default": 0}, synchronize_session=False)
+        
+        # Set new default role
+        db_role = self.get_role(role_id)
+        if not db_role:
+            return None
+        
+        db_role.is_default = 1
+        self.db.commit()
+        self.db.refresh(db_role)
+        
+        return db_role

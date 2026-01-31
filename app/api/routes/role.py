@@ -11,6 +11,21 @@ from app.api.dependencies import (
 
 router = APIRouter(prefix="/roles", tags=["roles"])
 
+@router.get("/default", response_model=RoleSimple)
+async def get_default_role(
+    service: RoleService = Depends(get_role_service),
+    _: dict = Depends(get_current_user_with_permission("view_roles"))
+):
+    return service.get_default_role()
+
+@router.patch("/default", response_model=RoleSimple)
+async def set_default_role(
+    role_id: int,
+    service: RoleService = Depends(get_role_service),
+    _: dict = Depends(get_current_user_with_permission("manage_roles"))
+):
+    return service.set_default_role(role_id)
+
 @router.post("/", response_model=Role, status_code=status.HTTP_201_CREATED)
 async def create_role(
     role: RoleCreate, 

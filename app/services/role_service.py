@@ -39,6 +39,56 @@ class RoleService:
         return self.role_repository.update_role(role_id, role)
 
     @log_operation(logger)
+    def set_default_role(self, role_id: int) -> Role:
+        """
+        Set a role as the default role
+        
+        Business Logic:
+        1. Verify role exists; if not, raise 404 error.
+        2. Prevent super admin or admin role to be default
+        3. Check if current role is already default; if so, return it.
+        4. Set role as default and unset previous default role.
+        
+        Args:
+            role_id (int): The ID of the role to set as default
+        
+        Raises:
+            HTTPException: Role not found
+            HTTPException: Failed to set default role
+        
+        Returns:
+            Role: The updated role object set as default
+        """
+        # Business Logic 1: Verify role exists
+        db_role = self.role_repository.get_role(role_id)
+        if not db_role:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Role not found"
+            )
+            
+        # Business Logic 2: Prevent super admin or admin role to be default (contain admin in name)
+        if "admin" in db_role.role_name.lower():
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cannot set superadmin or admin role as default"
+            )
+        
+        # Business Logic 3: Check if current role is already default; if so, return it.
+        if db_role.is_default:
+            return db_role
+        
+        # Business Logic 4: Set role as default and unset previous default role.
+        default_role = self.role_repository.set_role_as_default(role_id)
+        if not default_role:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to set default role"
+            )
+            
+        return default_role
+    
+    @log_operation(logger)
     def get_role(self, role_id: int) -> Role:
         role = self.role_repository.get_role(role_id)
         if not role:
@@ -48,6 +98,16 @@ class RoleService:
             )
         return role
 
+    @log_operation(logger)
+    def get_default_role(self) -> Role:
+        role = self.role_repository.get_default_role()
+        if not role:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Default role not found"
+            )
+        return role
+    
     @log_operation(logger)
     def get_roles(self, skip: int = 0, limit: int = 100) -> list[Role]:
         return self.role_repository.get_roles(skip, limit)
