@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, status
 from typing import List
 
 from app.core.security import get_current_user_with_permission
-from app.schemas.role import PermissionRole, Role, RoleCreate, RoleUpdate
+from app.schemas.role import PermissionRole, Role, RoleCreate, RoleDetail, RoleSimple, RoleUpdate
 from app.services.role_service import RoleService
 from app.api.dependencies import (
     get_role_service,
@@ -28,7 +28,7 @@ async def update_role(
 ):
     return service.update_role(role_id, role)
 
-@router.get("/", response_model=List[Role])
+@router.get("/", response_model=List[RoleSimple])
 async def read_roles(
     skip_limit: tuple = Depends(get_pagination_params), 
     service: RoleService = Depends(get_role_service),
@@ -37,7 +37,7 @@ async def read_roles(
     skip, limit = skip_limit
     return service.get_roles(skip, limit)
 
-@router.get("/{role_id}", response_model=Role)
+@router.get("/{role_id}", response_model=RoleDetail)
 async def read_role(
     role_id: int, 
     service: RoleService = Depends(get_role_service),
