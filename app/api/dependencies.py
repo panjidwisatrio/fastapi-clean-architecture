@@ -36,7 +36,7 @@ def get_otp_service(
 
 def get_token_blacklist_service(db: Session = Depends(get_db)) -> TokenBlacklistService:
     """Returns a TokenBlacklistService instance with its required repository"""
-    return TokenBlacklistService(TokenBlacklistRepository(db))
+    return TokenBlacklistService(db=db)
 
 def get_auth_service(
     db: Session = Depends(get_db),

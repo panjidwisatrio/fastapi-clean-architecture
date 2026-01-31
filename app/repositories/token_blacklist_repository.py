@@ -2,7 +2,7 @@ from datetime import datetime, timezone, timedelta
 from sqlalchemy.orm import Session
 from app.core.logging import setup_logger, log_operation
 from app.core.utils import get_current_utc_time
-from app.models.token_blacklist import TokenBlacklist
+from app.models.token_blacklist import TokenBlacklist, TokenType
 from app.core.config import settings
 
 logger = setup_logger("token_blacklist_repositories")
@@ -12,11 +12,12 @@ class TokenBlacklistRepository:
         self.db = db
     
     @log_operation(logger)
-    def add_to_blacklist(self, token: str, expires_at: datetime) -> TokenBlacklist:
+    def add_to_blacklist(self, token: str, expires_at: datetime, token_type: TokenType) -> TokenBlacklist:
         """Add a token to the blacklist"""
         db_blacklist = TokenBlacklist(
             token=token,
-            expires_at=expires_at
+            expires_at=expires_at,
+            type=token_type
         )
         self.db.add(db_blacklist)
         self.db.commit()
