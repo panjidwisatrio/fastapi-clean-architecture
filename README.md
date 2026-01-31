@@ -8,7 +8,7 @@
 
 **A modern, production-ready web application template built with FastAPI following clean architecture principles.**
 
-[📚 Full Documentation](https://yourusername.github.io/fastapi-clean-architecture/) • [🚀 Quick Start](#quick-start) • [✨ Features](#features)
+[📚 Full Documentation](https://panjidwisatrio.github.io/fastapi-clean-architecture/) • [🚀 Quick Start](#quick-start) • [✨ Features](#features)
 
 </div>
 
@@ -40,7 +40,7 @@ This template provides a robust foundation for building scalable REST APIs with:
 
 ```bash
 # 1. Clone repository
-git clone https://github.com/yourusername/fastapi-clean-architecture.git
+git clone https://github.com/panjidwisatrio/fastapi-clean-architecture.git
 cd fastapi-clean-architecture
 
 # 2. Create virtual environment
@@ -66,17 +66,17 @@ Visit [http://localhost:8000/docs](http://localhost:8000/docs) for interactive A
 
 ## 📚 Documentation
 
-Complete documentation is available at: **[https://yourusername.github.io/fastapi-clean-architecture/](https://yourusername.github.io/fastapi-clean-architecture/)**
+Complete documentation is available at: **[https://panjidwisatrio.github.io/fastapi-clean-architecture/](https://panjidwisatrio.github.io/fastapi-clean-architecture/)**
 
 ### Quick Links
 
-- [Installation Guide](https://yourusername.github.io/fastapi-clean-architecture/getting-started/installation/)
-- [Configuration](https://yourusername.github.io/fastapi-clean-architecture/getting-started/configuration/)
-- [Data Setup](https://yourusername.github.io/fastapi-clean-architecture/getting-started/data-setup/)
-- [Database Migrations](https://yourusername.github.io/fastapi-clean-architecture/database/migrations/)
-- [Architecture Overview](https://yourusername.github.io/fastapi-clean-architecture/architecture/overview/)
-- [Code Generation](https://yourusername.github.io/fastapi-clean-architecture/development/code-generation/)
-- [Troubleshooting](https://yourusername.github.io/fastapi-clean-architecture/troubleshooting/common-issues/)
+- [Installation Guide](https://panjidwisatrio.github.io/fastapi-clean-architecture/getting-started/installation/)
+- [Configuration](https://panjidwisatrio.github.io/fastapi-clean-architecture/getting-started/configuration/)
+- [Data Setup](https://panjidwisatrio.github.io/fastapi-clean-architecture/getting-started/data-setup/)
+- [Database Migrations](https://panjidwisatrio.github.io/fastapi-clean-architecture/database/migrations/)
+- [Architecture Overview](https://panjidwisatrio.github.io/fastapi-clean-architecture/architecture/overview/)
+- [Code Generation](https://panjidwisatrio.github.io/fastapi-clean-architecture/development/code-generation/)
+- [Troubleshooting](https://panjidwisatrio.github.io/fastapi-clean-architecture/troubleshooting/common-issues/)
 
 ### Build Documentation Locally
 
@@ -138,7 +138,7 @@ python module/generate.py service Product
 python module/generate.py route Product
 ```
 
-[Learn more about Code Generation →](https://yourusername.github.io/fastapi-clean-architecture/development/code-generation/)
+[Learn more about Code Generation →](https://panjidwisatrio.github.io/fastapi-clean-architecture/development/code-generation/)
 
 ## 📖 API Documentation
 
@@ -158,7 +158,7 @@ curl -X POST "http://localhost:8000/auth/login" \
   }'
 ```
 
-[View full API documentation →](https://yourusername.github.io/fastapi-clean-architecture/api/overview/)
+[View full API documentation →](https://panjidwisatrio.github.io/fastapi-clean-architecture/api/overview/)
 
 ## 🧪 Testing
 
@@ -192,11 +192,11 @@ docker build -t fastapi-app .
 docker run -p 8000:8000 --env-file .env.production fastapi-app
 ```
 
-[Full deployment guide →](https://yourusername.github.io/fastapi-clean-architecture/deployment/production/)
+[Full deployment guide →](https://panjidwisatrio.github.io/fastapi-clean-architecture/deployment/production/)
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please read our [Contributing Guidelines](https://yourusername.github.io/fastapi-clean-architecture/contributing/guidelines/).
+Contributions are welcome! Please read our [Contributing Guidelines](https://panjidwisatrio.github.io/fastapi-clean-architecture/contributing/guidelines/).
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/amazing-feature`)
@@ -218,9 +218,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 Support
 
-- 📖 [Documentation](https://yourusername.github.io/fastapi-clean-architecture/)
-- 🐛 [Issue Tracker](https://github.com/yourusername/fastapi-clean-architecture/issues)
-- 💬 [Discussions](https://github.com/yourusername/fastapi-clean-architecture/discussions)
+- 📖 [Documentation](https://panjidwisatrio.github.io/fastapi-clean-architecture/)
+- 🐛 [Issue Tracker](https://github.com/panjidwisatrio/fastapi-clean-architecture/issues)
+- 💬 [Discussions](https://github.com/panjidwisatrio/fastapi-clean-architecture/discussions)
 
 ---
 
