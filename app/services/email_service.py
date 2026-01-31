@@ -6,6 +6,7 @@ import logging
 
 from app.core.config import settings
 from app.core.logging import log_operation
+from app.models.otp import OTPType
 
 logger = logging.getLogger("email_services")
 
@@ -56,14 +57,11 @@ class EmailService:
             return False
     
     @log_operation(logger)
-    async def send_otp_email(self, to_email: str, otp_code: str, otp_type: str) -> bool:
+    async def send_verification_email(self, to_email: str, otp_code: str, otp_type: OTPType) -> bool:
         """Send OTP email"""
-        if otp_type == "register":
+        if otp_type == OTPType.REGISTER:
             subject = "Verification Code for Registration"
             purpose = "completing registration"
-        else:  # reset_password
-            subject = "Verification Code for Reset Password"
-            purpose = "resetting password"
 
         body = f"""
         <!DOCTYPE html>
@@ -165,7 +163,7 @@ class EmailService:
         return await self.send_email(to_email, subject, body, is_html=True)
     
     @log_operation(logger)
-    async def send_reset_password_email(to_email: str, otp_code: str) -> bool:
+    async def send_reset_password_email(self, to_email: str, token: str) -> bool:
         """
         Send password reset email with OTP link
         
@@ -176,7 +174,7 @@ class EmailService:
         Returns:
             bool: True if email sent successfully
         """
-        reset_link = f"{settings.FRONTEND_URL}{settings.FRONTEND_RESET_PASSWORD_ENDPOINT}?otp={otp_code}"
+        reset_link = f"{settings.APP_URL}{settings.RESET_PASSWORD_ENDPOINT}?token={token}"
         
         subject = "Reset Your Password"
         body = f"""
@@ -209,14 +207,14 @@ class EmailService:
                     </p>
                     <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
                     <p style="color: #999; font-size: 12px; text-align: center;">
-                        © {settings.EMAIL_FROM_NAME}. All rights reserved.
+                        © {settings.SMTP_FROM_NAME}. All rights reserved.
                     </p>
                 </div>
             </body>
         </html>
         """
         
-        return await EmailService.send_email(to_email, subject, body)
+        return await self.send_email(to_email, subject, body)
     
     @log_operation(logger)
     async def send_email_change_notification(self, to_email: str, full_name: str) -> bool:
@@ -253,4 +251,4 @@ class EmailService:
         </body>
         </html>
         """
-        return await EmailService.send_email(to_email, subject, body)
+        return await self.send_email(to_email, subject, body)
