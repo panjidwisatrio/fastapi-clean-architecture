@@ -1,0 +1,9 @@
+# 1. Create initial migration
+alembic revision --autogenerate -m "initial migration"
+
+# 2. Apply migration
+alembic upgrade head
+
+# 3. Create a new migration after modifying models
+alembic revision --autogenerate -m "add new column"
+alembic upgrade head
