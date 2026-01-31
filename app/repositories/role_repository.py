@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.core.logging import setup_logger, log_operation
 from app.models.role import Role
 from app.models.permission_role import PermissionRole
+from app.models.user import User
 from app.schemas.role import RoleCreate, RoleUpdate
 
 logger = setup_logger("role_repositories")
@@ -16,6 +17,10 @@ class RoleRepository:
     def get_role(self, role_id: int) -> Role:
         return self.db.query(Role).filter(Role.id == role_id).first()
 
+    @log_operation(logger)
+    def get_default_role(self) -> Role:
+        return self.db.query(Role).filter(Role.is_default == 1).first()
+    
     @log_operation(logger)
     def get_role_by_name(self, role_name: str) -> Role:
         return self.db.query(Role).filter(func.lower(Role.role_name) == role_name.lower()).first()
@@ -81,6 +86,35 @@ class RoleRepository:
             role_permission = PermissionRole(role_id=role_id, permission_id=pid)
             if role_permission:
                 self.db.delete(role_permission)
+        self.db.commit()
+        
+        return db_role
+    
+    @log_operation(logger)
+    def add_users_to_role(self, role_id: int, user_ids: List[int]) -> Role:
+        # Implementation to add users to role
+        db_role = self.get_role(role_id)
+        if not db_role:
+            return None
+        
+        # Bulk update users' role_id
+        self.db.query(User).filter(User.id.in_(user_ids)).update({"role_id": role_id}, synchronize_session=False)
+        self.db.commit()
+        
+        return db_role
+    
+    @log_operation(logger)
+    def remove_users_from_role(self, role_id: int, user_ids: List[int]) -> Role:
+        # Implementation to remove users from role
+        db_role = self.get_role(role_id)
+        if not db_role:
+            return None
+        
+        # Get default role to assign users to
+        default_role = self.db.query(Role).filter(Role.is_default == 1).first()
+        
+        # Bulk update users' role_id to default role
+        self.db.query(User).filter(User.id.in_(user_ids)).update({"role_id": default_role.id}, synchronize_session=False)
         self.db.commit()
         
         return db_role

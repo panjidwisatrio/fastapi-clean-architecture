@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends, status
-from typing import List
+from fastapi import APIRouter, Depends, Response, status
+from typing import List, Union
 
 from app.core.security import get_current_user_with_permission
-from app.schemas.role import PermissionRole, Role, RoleCreate, RoleDetail, RoleSimple, RoleUpdate
+from app.schemas.role import PermissionRole, Role, RoleCreate, RoleDetail, RoleSimple, RoleUpdate, UserAssignmentResult, UserUnassignmentResult, UsersRoleAssignment
 from app.services.role_service import RoleService
 from app.api.dependencies import (
     get_role_service,
@@ -69,3 +69,203 @@ async def remove_permission_from_role(
     _: dict = Depends(get_current_user_with_permission("manage_roles"))
 ):
     return service.remove_permission_from_role(permissions)
+
+@router.post("/assign/users", 
+    description="Assign a role to multiple users. some time admin or manager want to assign role to multiple users at once.",
+    response_model=Union[RoleDetail, UserAssignmentResult],
+    responses={
+        status.HTTP_207_MULTI_STATUS: {
+            "description": "Partial Success - Some user assignments failed",
+            "model": UserAssignmentResult,
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "description": "Role not found",
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "detail": {"type": "string"}
+                        }
+                    },
+                    "example": {"detail": "Role not found"}
+                }
+            }
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "description": "All users failed to be assigned to role",
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "detail": {
+                                "oneOf": [
+                                    {"type": "string"},
+                                    {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "properties": {
+                                                "user_id": {"type": "integer"},
+                                                "reason": {"type": "string"},
+                                            },
+                                            "required": ["user_id", "reason"],
+                                        },
+                                    },
+                                ]
+                            }
+                        },
+                        "required": ["detail"],
+                    },
+                    "examples": {
+                        "string_error": {
+                            "summary": "String error message",
+                            "value": {"detail": "Some error occurred during assignment"}
+                        },
+                        "list_error": {
+                            "summary": "List of failed assignments",
+                            "value": {
+                                "detail": [
+                                    {"user_id": 1, "reason": "User not found"},
+                                    {"user_id": 2, "reason": "User not active"}
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "description": "Failed to assign users to role",
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "detail": {"type": "string"}
+                        }
+                    },
+                    "example": {"detail": "Failed to assign users to role"}
+                }
+            }
+        }
+    }
+)
+async def assign_role_to_user(
+    assignment: UsersRoleAssignment,
+    response: Response,
+    service: RoleService = Depends(get_role_service),
+    _: dict = Depends(get_current_user_with_permission("manage_roles"))
+):
+    result = service.assign_role_to_users(assignment)
+    if isinstance(result, UserAssignmentResult) and result.failed_assignments:
+        response.status_code = status.HTTP_207_MULTI_STATUS
+    return result
+
+@router.post("/unassign/users", 
+    description="Unassign a role from multiple users. some time admin or manager want to unassign role from multiple users at once.",
+    response_model=Union[RoleDetail, UserUnassignmentResult],
+    responses={
+        status.HTTP_207_MULTI_STATUS: {
+            "description": "Partial Success - Some user unassignments failed",
+            "model": UserUnassignmentResult,
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "description": "Role not found",
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "detail": {"type": "string"}
+                        }
+                    },
+                    "example": {"detail": "Role not found"}
+                }
+            }
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "description": "All users failed to be assigned to role",
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "detail": {
+                                "oneOf": [
+                                    {"type": "string"},
+                                    {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "properties": {
+                                                "user_id": {"type": "integer"},
+                                                "reason": {"type": "string"},
+                                            },
+                                            "required": ["user_id", "reason"],
+                                        },
+                                    },
+                                ]
+                            }
+                        },
+                        "required": ["detail"],
+                    },
+                    "examples": {
+                        "string_error": {
+                            "summary": "String error message",
+                            "value": {"detail": "Some error occurred during unassignment"}
+                        },
+                        "list_error": {
+                            "summary": "List of failed assignments",
+                            "value": {
+                                "detail": [
+                                    {"user_id": 1, "reason": "User not found"},
+                                    {"user_id": 2, "reason": "User not verified"}
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        status.HTTP_403_FORBIDDEN: {
+            "description": "Cannot unassign default role from users",
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "detail": {"type": "string"}
+                        }
+                    },
+                    "example": {"detail": "Cannot unassign default role from users"}
+                }
+            }
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "description": "Failed to unassign users from role",
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "detail": {"type": "string"}
+                        }
+                    },
+                    "example": {"detail": "Failed to unassign users from role"}
+                }
+            }
+        }
+    }
+)
+async def unassign_role_from_user(
+    assignment: UsersRoleAssignment,
+    response: Response,
+    service: RoleService = Depends(get_role_service),
+    _: dict = Depends(get_current_user_with_permission("manage_roles"))
+):
+    result = service.unassign_role_from_users(assignment)
+    if isinstance(result, UserUnassignmentResult) and result.failed_unassignments:
+        response.status_code = status.HTTP_207_MULTI_STATUS
+    return result
