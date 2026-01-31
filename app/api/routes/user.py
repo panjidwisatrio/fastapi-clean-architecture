@@ -1,8 +1,9 @@
 from typing import List
 from fastapi import APIRouter, Depends, status
 
+from app.core.security import get_current_user_with_permission
 from app.schemas.user import User, UserCreate, UserUpdate
-from app.api.dependencies import get_current_user_with_permission, get_user_service, get_pagination_params
+from app.api.dependencies import get_user_service, get_pagination_params
 from app.services.user_service import UserService
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -19,7 +20,7 @@ async def create_user(
 async def read_user(
     user_id: int, 
     service: UserService = Depends(get_user_service),
-    _: User = Depends(get_current_user_with_permission("get_user_info_by_id"))
+    _: User = Depends(get_current_user_with_permission("get_user_by_id"))
 ):
     return service.get_user(user_id)
 
@@ -28,15 +29,15 @@ async def update_user(
     user: UserUpdate,
     user_id: int,
     service: UserService = Depends(get_user_service),
-    _: User = Depends(get_current_user_with_permission("update_user_info"))
+    _: User = Depends(get_current_user_with_permission("update_user"))
 ):
-    return service.update_user(user, user_id=user_id)
+    return await service.update_user(user, user_id=user_id)
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def deactivate_user(
     user_id: int,
     service: UserService = Depends(get_user_service),
-    _: User = Depends(get_current_user_with_permission("update_user_active_status"))
+    _: User = Depends(get_current_user_with_permission("deactivate_user"))
 ):
     service.deactivate_user(user_id)
     return None
@@ -45,7 +46,7 @@ async def deactivate_user(
 async def read_users(
     skip_limit: tuple = Depends(get_pagination_params),
     service: UserService = Depends(get_user_service),
-    _: User = Depends(get_current_user_with_permission("get_all_users_info"))
+    _: User = Depends(get_current_user_with_permission("get_users"))
 ):
     skip, limit = skip_limit
     return service.get_users(skip, limit)

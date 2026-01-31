@@ -22,9 +22,10 @@ def get_email_service() -> EmailService:
     """Returns an EmailService instance with its required configuration"""
     return EmailService()
 
+# Service factory dependencies
 def get_user_service(db: Session = Depends(get_db), email_service: EmailService = Depends(get_email_service)) -> UserService:
     """Returns a UserService instance with its required repository"""
-    return UserService(UserRepository(db), email_service=email_service)
+    return UserService(db=db, email_service=email_service)
 
 def get_otp_service(
     db: Session = Depends(get_db),

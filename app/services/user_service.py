@@ -1,53 +1,45 @@
 from typing import Optional, Union
 from fastapi import HTTPException, status
+from sqlalchemy.orm import Session
 from app.core.logging import setup_logger, log_operation
 from app.repositories.user_repository import UserRepository
-from app.schemas.user import PasswordUpdate, UserCreate, UserUpdate, User
+from app.schemas.user import MeUpdate, PasswordUpdate, UserCreate, UserUpdate, User
 from app.models.user import User as UserModel
-from app.schemas.auth import UserRegister
 from app.core.utils import get_password_hash
 from app.services.email_service import EmailService
 
 logger = setup_logger("user_services")
 
 class UserService:
-    def __init__(self, user_repository: UserRepository, email_service: EmailService):
-        self.user_repository = user_repository
+    def __init__(self, db: Session, email_service: EmailService):
+        self.user_repository = UserRepository(db)
         self.email_service = email_service
 
     @log_operation(logger)
-    async def create_user(self, user: Union[UserCreate, UserRegister]) -> User:
+    async def create_user(self, user: UserCreate) -> User:
         """
         Create a new user with validation and send welcome email if applicable
         
         Business Logic:
         1. Enforce email domain restrictions.
-        2. For UserRegister:
-            - Enforce password complexity.
-            - Ensure password and password_confirm match.
-        3. Check if email already exists.
-        4. For UserCreate:
-            - Validate role assignment if provided.
-            - Generate a random password.
-            - Hash the generated password.
-            - Create user in the database.
-            - Send welcome email with generated password.
-        5. For UserRegister:
-            - Create user in the database.
+        2. Check if email already exists.
+        3. Validate role assignment if provided.
+        4. Generate a random password.
+        5. Hash the generated password.
+        6. Create user in the database.
+        7. Send welcome email with generated password.
         
         Args:
-            user (Union[UserCreate, UserRegister]): User creation data
+            user (UserCreate): User creation data
             
         Returns:
             User: Created user object
             
         Raises:
             HTTPException: Email domain not allowed
-            HTTPException: Password does not meet complexity requirements
-            HTTPException: Password and password confirmation do not match
             HTTPException: Email already registered
             HTTPException: Invalid role assignment
-            HTTPException: Failed to send welcome email, user created without email notification, please contact admin
+            HTTPException: Failed to send welcome email, user created without email notification, please contact support
 
         """
         # Business logic 1: enforce email domain restrictions
@@ -56,24 +48,8 @@ class UserService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Email domain not allowed"
             )
-        
-        # Business logic 2: additional checks for UserRegister
-        if user.__class__ == UserRegister:
-            # Business logic 2.1: enforce password complexity for registration (enforce password complexity (at least 8 characters, one uppercase, one digit)
-            if not UserModel.validate_password_complexity(user.password):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Password does not meet complexity requirements"
-                )
-                
-            # Business logic 2.2: ensure password and password_confirm match for registration
-            if user.password != user.password_confirm:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Password and password confirmation do not match"
-                )
             
-        # Business logic 3: check if email already exists
+        # Business logic 2: check if email already exists
         existing_user = self.user_repository.get_user_by_email(user.email)
         if existing_user:
             raise HTTPException(
@@ -81,44 +57,38 @@ class UserService:
                 detail="Email already registered"
             )
         
-        # Business logic 4: additional checks for UserCreate
-        if user.__class__ == UserCreate:
-            # Business logic 4.1: validate role assignment if provided
-            if hasattr(user, "roles_id") and user.roles_id is not None:
-                if not self.validate_role_assignment(user.roles_id):
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="Invalid role assignment"
-                    )
-                    
-            # Business logic 4.2: generate a random password
-            generated_password = UserModel.generate_random_password()
-            
-            # Business logic 4.3: hash the generated password
-            user_dict = user.dict(exclude_unset=True)
-            user_dict["hashed_password"] = get_password_hash(generated_password)
-
-            # Business logic 4.3: create user in the database
-            user = self.user_repository.create_user_with_dict(user_dict)
-
-            # Business logic 4.4: send welcome email with generated password
-            email_sent = await self.email_service.send_welcome_email(
-                to_email=user.email,
-                full_name=f"{user.first_name} {user.last_name}",
-                generated_password=generated_password
-            )
-            if not email_sent:
-                logger.warning(f"Failed to send welcome email to {user.email}")
-                # You might want to raise an exception here
+        # Business logic 3: validate role assignment if provided
+        if hasattr(user, "roles_id") and user.roles_id is not None:
+            if not self.validate_role_assignment(user.roles_id):
                 raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Failed to send welcome email, user created without email notification, please contact admin"
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid role assignment"
                 )
+                
+        # Business logic 4: generate a random password
+        generated_password = UserModel.generate_random_password()
+        
+        # Business logic 5: hash the generated password
+        user_dict = user.dict(exclude_unset=True)
+        user_dict["hashed_password"] = get_password_hash(generated_password)
 
-            return user
-        else:
-            # Business logic 5: create user in the database for UserRegister
-            return self.user_repository.create_user(user)
+        # Business logic 6: create user in the database
+        user = self.user_repository.create_user_with_dict(user_dict)
+
+        # Business logic 7: send welcome email with generated password
+        email_sent = await self.email_service.send_welcome_email(
+            to_email=user.email,
+            full_name=f"{user.first_name} {user.last_name}",
+            generated_password=generated_password
+        )
+        if not email_sent:
+            logger.warning(f"Failed to send welcome email to {user.email}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to send welcome email, user created without email notification, please contact support"
+            )
+
+        return user
 
     @log_operation(logger)
     def get_user(self, user_id: int) -> User:
@@ -145,7 +115,7 @@ class UserService:
         return self.user_repository.get_users(skip, limit)
 
     @log_operation(logger)
-    async def update_user(self, user: Union[UserUpdate, PasswordUpdate], user_id: Optional[int] = None, email: Optional[str] = None) -> User:
+    async def update_user(self, user: Union[UserUpdate, MeUpdate, PasswordUpdate], user_id: Optional[int] = None, email: Optional[str] = None) -> User:
         """
         Update user information with validation and send notification email if applicable
         
@@ -179,7 +149,7 @@ class UserService:
             HTTPException: Password does not meet complexity requirements
             HTTPException: New password and password confirmation do not match
             HTTPException: User not found
-            HTTPException: Failed to send email change notification, please contact admin
+            HTTPException: Failed to send email change notification, please contact support
         """
         # Business logic 1: Additional checks for email update
         if hasattr(user, "email") and user.email is not None:
@@ -252,7 +222,7 @@ class UserService:
                 # You might want to raise an exception here
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Failed to send email change notification, please contact admin"
+                    detail="Failed to send email change notification, please contact support"
                 )
         
         return db_user
