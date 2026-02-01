@@ -1,3 +1,4 @@
+from sqlalchemy import text
 from app.core.database import engine, Base
 
 def create_tables():
@@ -90,7 +91,17 @@ def initiate_data(logger):
     finally:
         db.close()
 
-def init_db(logger):
+async def check_db_connection():
+    """Check database connection by executing a simple query."""
+    from app.core.database import SessionLocal
+    db = SessionLocal()
+    try:
+        # Execute a simple query
+        db.execute(text('SELECT 1'))
+    finally:
+        db.close()
+        
+async def init_db(logger):
     # Create tables
     create_tables()
     
