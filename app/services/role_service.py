@@ -1,10 +1,11 @@
+from typing import Union
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 from app.core.logging import setup_logger, log_operation
 from app.repositories.role_repository import RoleRepository
 from app.repositories.permission_repository import PermissionRepository
 from app.repositories.user_repository import UserRepository
-from app.schemas.role import PermissionRole, RoleCreate, Role, RoleUpdate
+from app.schemas.role import FailedAssignment, PermissionRole, RoleCreate, Role, RoleUpdate, UserAssignmentResult, UserUnassignmentResult, UsersRoleAssignment
 from app.services.cache_service import CacheService
 
 logger = setup_logger("role_services")
@@ -46,6 +47,56 @@ class RoleService:
         return self.role_repository.update_role(role_id, role)
 
     @log_operation(logger)
+    def set_default_role(self, role_id: int) -> Role:
+        """
+        Set a role as the default role
+        
+        Business Logic:
+        1. Verify role exists; if not, raise 404 error.
+        2. Prevent super admin or admin role to be default
+        3. Check if current role is already default; if so, return it.
+        4. Set role as default and unset previous default role.
+        
+        Args:
+            role_id (int): The ID of the role to set as default
+        
+        Raises:
+            HTTPException: Role not found
+            HTTPException: Failed to set default role
+        
+        Returns:
+            Role: The updated role object set as default
+        """
+        # Business Logic 1: Verify role exists
+        db_role = self.role_repository.get_role(role_id)
+        if not db_role:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Role not found"
+            )
+            
+        # Business Logic 2: Prevent super admin or admin role to be default (contain admin in name)
+        if "admin" in db_role.role_name.lower():
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cannot set superadmin or admin role as default"
+            )
+        
+        # Business Logic 3: Check if current role is already default; if so, return it.
+        if db_role.is_default:
+            return db_role
+        
+        # Business Logic 4: Set role as default and unset previous default role.
+        default_role = self.role_repository.set_role_as_default(role_id)
+        if not default_role:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to set default role"
+            )
+            
+        return default_role
+    
+    @log_operation(logger)
     def get_role(self, role_id: int) -> Role:
         role = self.role_repository.get_role(role_id)
         if not role:
@@ -55,6 +106,16 @@ class RoleService:
             )
         return role
 
+    @log_operation(logger)
+    def get_default_role(self) -> Role:
+        role = self.role_repository.get_default_role()
+        if not role:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Default role not found"
+            )
+        return role
+    
     @log_operation(logger)
     def get_roles(self, skip: int = 0, limit: int = 100) -> list[Role]:
         return self.role_repository.get_roles(skip, limit)
@@ -214,3 +275,173 @@ class RoleService:
             )
         
         return db_role
+    
+    @log_operation(logger)
+    def assign_role_to_users(self, assignment: UsersRoleAssignment) -> Union[Role, UserAssignmentResult]:
+        """
+        Assign users to a role
+
+        Business Logic:
+        1. Verify role exists; if not, raise 404 error.
+        2. Verify users are available; if not, add error 404 for respective user to list.
+        3. Verify users are verified; if not, add error 403 for respective user to list.
+        4. Verify users are active; if not, add error 403 for respective user to list.
+        5. Verify users are not already assigned to the role; if so, add error 409 for respective user to list.
+        6. filter out invalid users and assign valid users to the role.
+        7. If any errors were collected and some are valid assignments, return 207 Multi-Status with details.
+        8. If all users failed validation, raise HTTPException with 400 Bad Request and details.
+        9. If all users were successfully assigned, return the updated role.
+        
+        Args:
+            assignment (UsersRoleAssignment): Role ID and list of User IDs to assign
+
+        Raises:
+            HTTPException: Role not found
+        
+        Returns:
+            Role: The updated role object with users assigned
+        """
+        # Business Logic 1: Verify role exists
+        role = self.role_repository.get_role(assignment.role_id)
+        if not role:
+            logger.error(f"Role ID {assignment.role_id} not found.")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Role not found"
+            )
+        
+        # Business Logic 2: Validate users
+        errors = []
+        valid_user_ids = []
+        for user_id in assignment.user_ids:
+            user = self.user_repository.get_user(user_id)
+            if not user:
+                errors.append(FailedAssignment(user_id=user_id, reason="User not found").dict())
+                continue
+            if not user.is_verified:
+                errors.append(FailedAssignment(user_id=user_id, reason="User not verified").dict())
+                continue
+            if not user.is_active:
+                errors.append(FailedAssignment(user_id=user_id, reason="User not active").dict())
+                continue
+            if user.role_id == assignment.role_id:
+                errors.append(FailedAssignment(user_id=user_id, reason="User already assigned to this role").dict())
+                continue
+            valid_user_ids.append(user_id)
+        
+        # Business Logic 3: Assign valid users to the role
+        if valid_user_ids:
+            if not self.role_repository.add_users_to_role(assignment.role_id, valid_user_ids):
+                logger.error(f"Failed to assign users {valid_user_ids} to role ID {assignment.role_id}.")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to assign users to role"
+                )
+        
+        # Business Logic 4: Handle response based on errors and valid assignments
+        if errors and valid_user_ids:
+            return UserAssignmentResult(
+                failed_assignments=errors,
+                **self.role_repository.get_role(assignment.role_id).dict()
+            )
+        elif errors and not valid_user_ids:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=errors
+            )
+        
+        return self.role_repository.get_role(assignment.role_id)
+    
+    @log_operation(logger)
+    def unassign_role_from_users(self, assignment: UsersRoleAssignment) -> Union[Role, UserUnassignmentResult]:
+        """
+        Unassign users from a role
+
+        Business Logic:
+        1. Verify role exists; if not, raise 404 error.
+        2. Verify if role is default role; if so, raise 403 error.
+        3. Verify if default role exists; if not, raise 500 error.
+        4. Verify users are available; if not, add error 404 for respective user to list.
+        5. Verify users are verified; if not, add error 403 for respective user to list.
+        6. Verify users are active; if not, add error 403 for respective user to list.
+        7. Verify users were have another role assigned; if so, add error 409 for respective user to list.
+        8. filter out invalid users and unassign valid users from the role.
+        9. If any errors were collected and some are valid unassignments, return 207 Multi-Status with details.
+        10. If all users failed validation, raise HTTPException with 400 Bad Request and details.
+        11. If all users were successfully unassigned, return the updated role.
+        
+        Args:
+            assignment (UsersRoleAssignment): Role ID and list of User IDs to unassign
+
+        Raises:
+            HTTPException: Role not found
+            HTTPException: Role is default role
+            HTTPException: Default role not found
+        
+        Returns:
+            Role: The updated role object with users unassigned
+        """
+        # Business Logic 1: Verify role exists
+        role = self.role_repository.get_role(assignment.role_id)
+        if not role:
+            logger.error(f"Role ID {assignment.role_id} not found.")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Role not found"
+            )
+            
+        # Business Logic 2: Prevent unassignment from default role
+        if role.is_default:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cannot unassign users from default role"
+            )
+            
+        # Business Logic 3: Verify default role exists
+        default_role = self.role_repository.get_default_role()
+        if not default_role:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Default role not found. Cannot reassign users."
+            )
+        
+        # Business Logic 4: Validate users
+        errors = []
+        valid_user_ids = []
+        for user_id in assignment.user_ids:
+            user = self.user_repository.get_user(user_id)
+            if not user:
+                errors.append(FailedAssignment(user_id=user_id, reason="User not found").dict())
+                continue
+            if not user.is_verified:
+                errors.append(FailedAssignment(user_id=user_id, reason="User not verified").dict())
+                continue
+            if not user.is_active:
+                errors.append(FailedAssignment(user_id=user_id, reason="User not active").dict())
+                continue
+            if user.role_id != assignment.role_id:
+                errors.append(FailedAssignment(user_id=user_id, reason="User not assigned to this role").dict())
+                continue
+            valid_user_ids.append(user_id)
+        
+        # Business Logic 5: Unassign valid users from the role
+        if valid_user_ids:
+            if not self.role_repository.remove_users_from_role(assignment.role_id, valid_user_ids):
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to unassign users from role"
+                )
+        
+        # Business Logic 6: Handle response based on errors and valid unassignments
+        if errors and valid_user_ids:
+            return UserUnassignmentResult(
+                failed_unassignments=errors,
+                **self.role_repository.get_role(assignment.role_id).dict()
+            )
+        elif errors and not valid_user_ids:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=errors
+            )
+        
+        return self.role_repository.get_role(assignment.role_id)
