@@ -3,6 +3,7 @@ import os
 import re
 from pydantic import BaseSettings
 from functools import lru_cache
+import redis.asyncio as redisaio
 
 def resolve_env_vars(value: str) -> str:
     """
@@ -31,6 +32,8 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     ACCEPTED_EMAIL_DOMAINS: str = "*"
     DATABASE_URL: str
+    REDIS_URL: str
+    CACHE_EXPIRE_SECONDS: int = 60
     
     # Frontend Configuration (Frontend URL, Endpoints, etc.)
     APP_URL: str = "http://localhost:5000"
@@ -92,4 +95,39 @@ def get_settings():
     
     return settings
 
+
+class RedisClient:
+    _instance = None
+    _redis_client = None
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(RedisClient, cls).__new__(cls)
+        return cls._instance
+    
+    def get_client(self):
+        if self._redis_client is None:
+            self._redis_client = redisaio.from_url(
+                settings.REDIS_URL, 
+                encoding="utf-8", 
+                decode_responses=True
+            )
+        return self._redis_client
+    
+    async def close(self):
+        if self._redis_client is not None:
+            await self._redis_client.close()
+            self._redis_client = None
+    
+    async def ping(self):
+        if self._redis_client is not None:
+            return await self._redis_client.ping()
+        return False
+
+@lru_cache()
+def get_redis():
+    redis_client = RedisClient()
+    return redis_client
+    
+redis = get_redis()
 settings = get_settings()

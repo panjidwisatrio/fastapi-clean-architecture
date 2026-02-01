@@ -4,6 +4,8 @@ from app.api.routes import auth, me, permission, user, role, otp
 from app.core.logging import log_request, setup_logger
 from app.core.init_db import init_db
 from app.core.config import settings
+from app.core.config import redis
+from app.core.init_redis import init_redis
 
 app = FastAPI()
 
@@ -30,6 +32,16 @@ async def startup_db_client():
     logger.info("Initializing database on startup")
     init_db(logger)
     logger.info("Database initialization completed")
+    
+    logger.info("Initializing Redis cache on startup")
+    await init_redis()
+    logger.info("Redis cache initialization completed")
+    
+@app.on_event("shutdown")
+async def shutdown_db_client():
+    logger.info("Application shutdown: closing resources if any")
+    await redis.close()
+    logger.info("Resources closed successfully")
 
 # Include API routers
 app.include_router(auth.router)
