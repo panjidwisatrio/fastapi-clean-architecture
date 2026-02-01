@@ -5,36 +5,44 @@ from app.repositories.role_repository import RoleRepository
 from app.repositories.permission_repository import PermissionRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas.role import PermissionRole, RoleCreate, Role, RoleUpdate
+from app.services.cache_service import CacheService
 
 logger = setup_logger("role_services")
 
 class RoleService:
     def __init__(
         self,
-        db: Session
+        db: Session,
+        cache_service: CacheService,
     ):
         self.role_repository = RoleRepository(db)
         self.permission_repository = PermissionRepository(db)
         self.user_repository = UserRepository(db)
+        self.cache_service = cache_service
 
     @log_operation(logger)
-    def create_role(self, role: RoleCreate) -> Role:
+    async def create_role(self, role: RoleCreate) -> Role:
         existing_role = self.role_repository.get_role_by_name(role.role_name)
         if existing_role:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Role already exists"
             )
+        
+        # Invalidate role cache
+        await self.cache_service.invalidate_role_cache()
         return self.role_repository.create_role(role)
     
     @log_operation(logger)
-    def update_role(self, role_id: int, role: RoleUpdate) -> Role:
+    async def update_role(self, role_id: int, role: RoleUpdate) -> Role:
         db_role = self.role_repository.get_role(role_id)
         if not db_role:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Role not found"
             )
+        # Invalidate role cache
+        await self.cache_service.invalidate_role_cache()
         return self.role_repository.update_role(role_id, role)
 
     @log_operation(logger)
@@ -52,7 +60,7 @@ class RoleService:
         return self.role_repository.get_roles(skip, limit)
 
     @log_operation(logger)
-    def delete_role(self, role_id: int) -> Role:
+    async def delete_role(self, role_id: int) -> Role:
         """
         Delete a role by its ID
         
@@ -61,6 +69,7 @@ class RoleService:
         - Check if role is superadmin; if so, prevent deletion.
         - update affected users to a default role before deletion.
         - Delete the role from the database.
+        - Invalidate role cache.
         
         Args:
             role_id (int): The ID of the role to delete
@@ -101,6 +110,9 @@ class RoleService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Role not found"
             )
+        
+        # Invalidate role cache
+        await self.cache_service.invalidate_role_cache()
         return db_role
 
     @log_operation(logger)

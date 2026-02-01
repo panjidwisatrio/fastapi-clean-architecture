@@ -10,6 +10,7 @@ from app.services.token_blacklist_service import TokenBlacklistService
 from app.services.user_service import UserService
 from app.services.role_service import RoleService
 from app.services.permission_service import PermissionService
+from app.services.cache_service import CacheService
 
 # External service dependencies
 def get_email_service() -> EmailService:
@@ -17,9 +18,13 @@ def get_email_service() -> EmailService:
     return EmailService()
 
 # Service factory dependencies
-def get_user_service(db: Session = Depends(get_db), email_service: EmailService = Depends(get_email_service)) -> UserService:
+def get_user_service(
+    db: Session = Depends(get_db), 
+    email_service: EmailService = Depends(get_email_service),
+    cache_service: CacheService = Depends()
+) -> UserService:
     """Returns a UserService instance with its required repository"""
-    return UserService(db=db, email_service=email_service)
+    return UserService(db=db, email_service=email_service, cache_service=cache_service)
 
 def get_otp_service(
     db: Session = Depends(get_db),
@@ -34,17 +39,18 @@ def get_token_blacklist_service(db: Session = Depends(get_db)) -> TokenBlacklist
 def get_auth_service(
     db: Session = Depends(get_db),
     email_service: EmailService = Depends(get_email_service),
+    cache_service: CacheService = Depends()
 ) -> AuthService:
     """Returns an AuthService instance with its required repositories"""
-    return AuthService(db=db, email_service=email_service)
+    return AuthService(db=db, email_service=email_service, cache_service=cache_service)
 
-def get_role_service(db: Session = Depends(get_db)) -> RoleService:
+def get_role_service(db: Session = Depends(get_db), cache_service: CacheService = Depends()) -> RoleService:
     """Returns a RoleService instance with its required repositories"""
-    return RoleService(db=db)
+    return RoleService(db=db, cache_service=cache_service)
 
-def get_permission_service(db: Session = Depends(get_db)) -> PermissionService:
+def get_permission_service(db: Session = Depends(get_db), cache_service: CacheService = Depends()) -> PermissionService:
     """Returns a PermissionService instance with its required repository"""
-    return PermissionService(db=db)
+    return PermissionService(db=db, cache_service=cache_service)
 
 # Pagination dependencies
 def get_pagination_params(skip: int = 0, limit: int = 100) -> Tuple[int, int]:

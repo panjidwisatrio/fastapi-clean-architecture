@@ -6,14 +6,16 @@ from app.repositories.user_repository import UserRepository
 from app.schemas.user import MeUpdate, PasswordUpdate, UserCreate, UserUpdate, User
 from app.models.user import User as UserModel
 from app.core.utils import get_password_hash
+from app.services.cache_service import CacheService
 from app.services.email_service import EmailService
 
 logger = setup_logger("user_services")
 
 class UserService:
-    def __init__(self, db: Session, email_service: EmailService):
+    def __init__(self, db: Session, email_service: EmailService, cache_service: CacheService):
         self.user_repository = UserRepository(db)
         self.email_service = email_service
+        self.cache_service = cache_service
 
     @log_operation(logger)
     async def create_user(self, user: UserCreate) -> User:
@@ -27,7 +29,8 @@ class UserService:
         4. Generate a random password.
         5. Hash the generated password.
         6. Create user in the database.
-        7. Send welcome email with generated password.
+        7. Invalidate user cache.
+        8. Send welcome email with generated password.
         
         Args:
             user (UserCreate): User creation data
@@ -75,7 +78,10 @@ class UserService:
         # Business logic 6: create user in the database
         user = self.user_repository.create_user_with_dict(user_dict)
 
-        # Business logic 7: send welcome email with generated password
+        # Business logic 7: invalidate user cache
+        await self.cache_service.invalidate_user_cache()
+
+        # Business logic 8: send welcome email with generated password
         email_sent = await self.email_service.send_welcome_email(
             to_email=user.email,
             full_name=f"{user.first_name} {user.last_name}",
@@ -131,7 +137,8 @@ class UserService:
             - Ensure new password and password_confirm match.
             - Hash the new password.
         5. Update the user in the database.
-        6. If email was changed, send notification email.
+        6. Invalidate user cache.
+        7. If email was changed, send notification email.
         
         Args:
             user (Union[UserUpdate, PasswordUpdate]): User update data
@@ -211,7 +218,10 @@ class UserService:
                 detail="User not found"
             )
         
-        #  Business logic 5: send notification email if email was changed
+        # Business logic 6: invalidate user cache
+        await self.cache_service.invalidate_user_cache()
+        
+        #  Business logic 7: send notification email if email was changed
         if hasattr(user, "email") and user.email is not None:
             email_sent = await self.email_service.send_email_change_notification(
                 to_email=user.email,
@@ -228,13 +238,17 @@ class UserService:
         return db_user
 
     @log_operation(logger)
-    def deactivate_user(self, user_id: int) -> User:
+    async def deactivate_user(self, user_id: int) -> User:
         db_user = self.user_repository.deactivate_user(user_id)
         if not db_user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="User not found"
             )
+        
+        # Invalidate user cache
+        await self.cache_service.invalidate_user_cache()
+        
         return db_user
     
     @log_operation(logger)
