@@ -1,10 +1,12 @@
 from typing import List
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Response, status
 
+from app.core.cache import cache_user
 from app.core.security import get_current_user_with_permission
 from app.schemas.user import User, UserCreate, UserUpdate
 from app.api.dependencies import get_user_service, get_pagination_params
 from app.services.user_service import UserService
+from app.core.config import settings
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -17,11 +19,18 @@ async def create_user(
     return await service.create_user(user)
 
 @router.get("/{user_id}", response_model=User)
+@cache_user(expire=settings.CACHE_EXPIRE_SECONDS)
 async def read_user(
+    response: Response,
     user_id: int, 
     service: UserService = Depends(get_user_service),
     _: User = Depends(get_current_user_with_permission("get_user_by_id"))
 ):
+    # Disable browser cache - force server revalidation
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    
     return service.get_user(user_id)
 
 @router.put("/{user_id}", response_model=User)
@@ -39,14 +48,21 @@ async def deactivate_user(
     service: UserService = Depends(get_user_service),
     _: User = Depends(get_current_user_with_permission("deactivate_user"))
 ):
-    service.deactivate_user(user_id)
+    await service.deactivate_user(user_id)
     return None
 
 @router.get("/", response_model=List[User])
+@cache_user(expire=settings.CACHE_EXPIRE_SECONDS)
 async def read_users(
+    response: Response,
     skip_limit: tuple = Depends(get_pagination_params),
     service: UserService = Depends(get_user_service),
     _: User = Depends(get_current_user_with_permission("get_users"))
 ):
+    # Disable browser cache - force server revalidation
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    
     skip, limit = skip_limit
     return service.get_users(skip, limit)
