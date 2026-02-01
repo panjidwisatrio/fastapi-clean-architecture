@@ -2,8 +2,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import auth, me, permission, user, role, otp
 from app.core.logging import log_request, setup_logger
-from app.core.init_db import init_db
+from app.core.init_db import check_db_connection, init_db
 from app.core.config import settings
+from app.core.config import redis
+from app.core.init_redis import init_redis
 
 app = FastAPI()
 
@@ -28,8 +30,18 @@ app.add_middleware(
 @app.on_event("startup")
 async def startup_db_client():
     logger.info("Initializing database on startup")
-    init_db(logger)
+    await init_db(logger)
     logger.info("Database initialization completed")
+    
+    logger.info("Initializing Redis cache on startup")
+    await init_redis()
+    logger.info("Redis cache initialization completed")
+    
+@app.on_event("shutdown")
+async def shutdown_db_client():
+    logger.info("Application shutdown: closing resources if any")
+    await redis.close()
+    logger.info("Resources closed successfully")
 
 # Include API routers
 app.include_router(auth.router)
@@ -42,3 +54,24 @@ app.include_router(otp.router)
 @app.get("/")
 def read_root():
     return {"message": "Welcome to the FastAPI Clean Architecture API"}
+
+@app.get("/health")
+async def health_check():
+    logger.info("Check redis connection for health check")
+    try:
+        await redis.ping()
+        logger.info("Redis health check successful")
+    except Exception as e:
+        logger.error(f"Redis health check failed: {e}")
+        return {"status": "unhealthy", "reason": str(e)}
+    
+    logger.info("Check database connection for health check")
+    try:
+        # Assuming a function `check_db_connection` exists to verify DB connection
+        await check_db_connection()
+        logger.info("Database health check successful")
+    except Exception as e:
+        logger.error(f"Database health check failed: {e}")
+        return {"status": "unhealthy", "reason": str(e)}
+    
+    return {"status": "healthy"}

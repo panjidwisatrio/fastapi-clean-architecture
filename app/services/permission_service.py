@@ -3,21 +3,26 @@ from sqlalchemy.orm import Session
 from app.core.logging import setup_logger, log_operation
 from app.repositories.permission_repository import PermissionRepository
 from app.schemas.permission import PermissionCreate, Permission
+from app.services.cache_service import CacheService
 
 logger = setup_logger("permission_services")
 
 class PermissionService:
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, cache_service: CacheService):
         self.permission_repository = PermissionRepository(db)
+        self.cache_service = cache_service
 
     @log_operation(logger)
-    def create_permission(self, permission: PermissionCreate) -> Permission:
+    async def create_permission(self, permission: PermissionCreate) -> Permission:
         existing_permission = self.permission_repository.get_permission_by_name(permission.permission_name)
         if existing_permission:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Permission already exists"
             )
+            
+        # Invalidate permission cache
+        await self.cache_service.invalidate_permission_cache()
         return self.permission_repository.create_permission(permission)
 
     @log_operation(logger)
@@ -35,11 +40,14 @@ class PermissionService:
         return self.permission_repository.get_permissions(skip, limit)
 
     @log_operation(logger)
-    def delete_permission(self, permission_id: int) -> Permission:
+    async def delete_permission(self, permission_id: int) -> Permission:
         db_permission = self.permission_repository.delete_permission(permission_id)
         if not db_permission:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Permission not found"
             )
+            
+        # Invalidate permission cache
+        await self.cache_service.invalidate_permission_cache()
         return db_permission

@@ -12,6 +12,7 @@ from app.schemas.user import PasswordUpdate, User, UserUpdate
 from app.schemas.auth import ForgotPasswordRequest, ResendVerificationOTPRequest, UserRegister, VerifyEmailRequest
 from app.core.security import create_access_token, create_refresh_token, decode_token
 from app.core.utils import verify_password
+from app.services.cache_service import CacheService
 from app.services.email_service import EmailService
 from app.models.otp import OTP, OTPType
 from app.models.user import User as UserModel
@@ -44,6 +45,7 @@ class AuthService:
         self, 
         db: Session, 
         email_service: EmailService, 
+        cache_service: CacheService
     ):
         self.user_repository = UserRepository(db)
         self.otp_repository = OTPRepository(db)
@@ -51,6 +53,7 @@ class AuthService:
         
         # External services
         self.email_service = email_service
+        self.cache_service = cache_service
     
     @log_operation(logger)
     def refresh_access_token(self, refresh_token: str) -> str:
@@ -87,9 +90,10 @@ class AuthService:
         3. Ensure password and password_confirm match for registration.
         4. Check if email already exists.
         5. Create user in the database.
-        6. Generate verification OTP.
-        7. Save OTP to database.
-        8. Send verification email.
+        6. Invalidate user cache.
+        7. Generate verification OTP.
+        8. Save OTP to database.
+        9. Send verification email.
 
         Args:
             user (UserRegister): User registration data
@@ -135,11 +139,14 @@ class AuthService:
         # Business logic 5: create user in the database for UserRegister
         user = self.user_repository.create_user(user)
         
-        # Business logic 6: generate verification OTP (omitted for brevity)
+        # Business logic 6: invalidate user cache
+        await self.cache_service.invalidate_user_cache()
+        
+        # Business logic 7: generate verification OTP (omitted for brevity)
         otp = OTP.generate_code()
         expires_at = OTP.get_expiry_time()
         
-        # Business logic 7: save OTP to database
+        # Business logic 8: save OTP to database
         self.otp_repository.create(
             email=user.email,
             code=otp,
@@ -148,7 +155,7 @@ class AuthService:
             user_id=user.id
         )
         
-        # Business logic 8: send verification email
+        # Business logic 9: send verification email
         email_sent = await self.email_service.send_verification_email(
             to_email=user.email,
             otp_code=otp,
@@ -172,6 +179,7 @@ class AuthService:
         1. Retrieve valid OTP from the database.
         2. Mark OTP as used.
         3. Update user's is_verified status.
+        4. Invalidate user cache.
 
         Args:
             email (str): User's email address
@@ -196,6 +204,9 @@ class AuthService:
         
         # Business logic 3: update user's is_verified status
         self.user_repository.verify_user(verify_request.email)
+        
+        # Business logic 4: invalidate user cache
+        await self.cache_service.invalidate_user_cache()
         
         return True
     
