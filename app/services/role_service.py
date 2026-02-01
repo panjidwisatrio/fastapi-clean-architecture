@@ -177,7 +177,7 @@ class RoleService:
         return db_role
 
     @log_operation(logger)
-    def add_permission_to_role(self, permissions: PermissionRole) -> Role:
+    async def add_permission_to_role(self, permissions: PermissionRole) -> Role:
         """
         Add permission(s) to a role
 
@@ -227,10 +227,13 @@ class RoleService:
                 detail="Role not found"
             )
         
+        # Business Logic 5: Invalidate role cache
+        await self.cache_service.invalidate_role_cache()
+        
         return db_role
 
     @log_operation(logger)
-    def remove_permission_from_role(self, permissions: PermissionRole) -> Role:
+    async def remove_permission_from_role(self, permissions: PermissionRole) -> Role:
         """
         Remove permission(s) from a role
 
@@ -274,10 +277,13 @@ class RoleService:
                 detail="Role not found"
             )
         
+        # Business Logic 4: Invalidate role cache
+        await self.cache_service.invalidate_role_cache()
+        
         return db_role
     
     @log_operation(logger)
-    def assign_role_to_users(self, assignment: UsersRoleAssignment) -> Union[Role, UserAssignmentResult]:
+    async def assign_role_to_users(self, assignment: UsersRoleAssignment) -> Union[Role, UserAssignmentResult]:
         """
         Assign users to a role
 
@@ -288,9 +294,9 @@ class RoleService:
         4. Verify users are active; if not, add error 403 for respective user to list.
         5. Verify users are not already assigned to the role; if so, add error 409 for respective user to list.
         6. filter out invalid users and assign valid users to the role.
-        7. If any errors were collected and some are valid assignments, return 207 Multi-Status with details.
+        7. If any errors were collected and some are valid assignments, return 207 Multi-Status with details and invalidate cache.
         8. If all users failed validation, raise HTTPException with 400 Bad Request and details.
-        9. If all users were successfully assigned, return the updated role.
+        9. If all users were successfully assigned, return the updated role and invalidate cache.
         
         Args:
             assignment (UsersRoleAssignment): Role ID and list of User IDs to assign
@@ -340,6 +346,9 @@ class RoleService:
         
         # Business Logic 4: Handle response based on errors and valid assignments
         if errors and valid_user_ids:
+            # Business Logic 4.1: Invalidate role cache
+            await self.cache_service.invalidate_role_cache()
+            
             return UserAssignmentResult(
                 failed_assignments=errors,
                 **self.role_repository.get_role(assignment.role_id).dict()
@@ -350,10 +359,13 @@ class RoleService:
                 detail=errors
             )
         
+        # Business Logic 5: Invalidate role cache
+        await self.cache_service.invalidate_role_cache()
+
         return self.role_repository.get_role(assignment.role_id)
     
     @log_operation(logger)
-    def unassign_role_from_users(self, assignment: UsersRoleAssignment) -> Union[Role, UserUnassignmentResult]:
+    async def unassign_role_from_users(self, assignment: UsersRoleAssignment) -> Union[Role, UserUnassignmentResult]:
         """
         Unassign users from a role
 
@@ -366,9 +378,9 @@ class RoleService:
         6. Verify users are active; if not, add error 403 for respective user to list.
         7. Verify users were have another role assigned; if so, add error 409 for respective user to list.
         8. filter out invalid users and unassign valid users from the role.
-        9. If any errors were collected and some are valid unassignments, return 207 Multi-Status with details.
+        9. If any errors were collected and some are valid unassignments, return 207 Multi-Status with details and invalidate cache.
         10. If all users failed validation, raise HTTPException with 400 Bad Request and details.
-        11. If all users were successfully unassigned, return the updated role.
+        11. If all users were successfully unassigned, return the updated role and invalidate cache.
         
         Args:
             assignment (UsersRoleAssignment): Role ID and list of User IDs to unassign
@@ -434,6 +446,9 @@ class RoleService:
         
         # Business Logic 6: Handle response based on errors and valid unassignments
         if errors and valid_user_ids:
+            # Business Logic 6.1: Invalidate role cache
+            await self.cache_service.invalidate_role_cache()
+            
             return UserUnassignmentResult(
                 failed_unassignments=errors,
                 **self.role_repository.get_role(assignment.role_id).dict()
@@ -443,5 +458,8 @@ class RoleService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=errors
             )
+        
+        # Business Logic 7: Invalidate role cache
+        await self.cache_service.invalidate_role_cache()
         
         return self.role_repository.get_role(assignment.role_id)

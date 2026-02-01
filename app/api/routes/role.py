@@ -91,7 +91,7 @@ async def add_permission_to_role(
     service: RoleService = Depends(get_role_service),
     _: dict = Depends(get_current_user_with_permission("manage_roles"))
 ):
-    return service.add_permission_to_role(permissions)
+    return await service.add_permission_to_role(permissions)
 
 @router.delete("/permissions", response_model=Role)
 async def remove_permission_from_role(
@@ -99,7 +99,7 @@ async def remove_permission_from_role(
     service: RoleService = Depends(get_role_service),
     _: dict = Depends(get_current_user_with_permission("manage_roles"))
 ):
-    return service.remove_permission_from_role(permissions)
+    return await service.remove_permission_from_role(permissions)
 
 @router.post("/assign/users", 
     description="Assign a role to multiple users. some time admin or manager want to assign role to multiple users at once.",
@@ -189,7 +189,7 @@ async def assign_role_to_user(
     service: RoleService = Depends(get_role_service),
     _: dict = Depends(get_current_user_with_permission("manage_roles"))
 ):
-    result = service.assign_role_to_users(assignment)
+    result = await service.assign_role_to_users(assignment)
     if isinstance(result, UserAssignmentResult) and result.failed_assignments:
         response.status_code = status.HTTP_207_MULTI_STATUS
     return result
@@ -296,7 +296,7 @@ async def unassign_role_from_user(
     service: RoleService = Depends(get_role_service),
     _: dict = Depends(get_current_user_with_permission("manage_roles"))
 ):
-    result = service.unassign_role_from_users(assignment)
+    result = await service.unassign_role_from_users(assignment)
     if isinstance(result, UserUnassignmentResult) and result.failed_unassignments:
         response.status_code = status.HTTP_207_MULTI_STATUS
     return result
