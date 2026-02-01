@@ -40,7 +40,7 @@ def initiate_data(logger):
             # Check if role already exists
             role = db.query(Role).filter(Role.role_name == role_name).first()
             if not role:
-                role = Role(role_name=role_name, description=role_info["description"])
+                role = Role(role_name=role_name, description=role_info["description"], is_default=role_info.get("is_default", False))
                 db.add(role)
                 db.flush()
                 logger.info(f"Created role: {role_name}")
